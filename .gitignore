@@ -1,0 +1,30 @@
+# Dependency directories
+node_modules/
+
+# Optional eslint cache
+.eslintcache
+
+lib/
+
+# WebStorm Local files
+.idea/
+
+.DS_Store
+
+yarn-error.log
+
+.experiments/
+
+yalc.lock
+
+# .yalc/ #do not uncomment this if you want to cascade packages
+
+/cache/
+
+/db/
+
+bundles/
+
+.secrets
+
+cache
