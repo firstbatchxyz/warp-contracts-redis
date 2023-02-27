@@ -34,7 +34,8 @@
   },
   "files": [
     "lib/",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "devDependencies": {
     "@types/jest": "^28.1.6",

@@ -1,6 +1,6 @@
 # Warp Contracts Redis Cache
 
-Warp Contracts implementation of the `SortKeyCache` using [Redis](https://redis.io/).
+Warp Contracts implementation of the `SortKeyCache` using [Redis](https://redis.io/). To learn more about `SortKey`'s, see [Warp docs](https://academy.warp.cc/docs/sdk/advanced/bundled-interaction#how-it-works).
 
 ## Installation
 
