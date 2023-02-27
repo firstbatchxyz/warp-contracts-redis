@@ -9,15 +9,15 @@ import {
   lastPossibleSortKey,
 } from "warp-contracts";
 import { createClient } from "redis";
-import { RedisCacheOptions } from "./types";
+import { RedisCacheOptions } from "types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export class RedisCache<V = any> implements SortKeyCache<V> {
   private readonly logger = LoggerFactory.INST.create("RedisCache");
   prefix: string;
   client: ReturnType<typeof createClient>;
-  maxEntriesPerContract: number;
-  minEntriesPerContract: number;
+  maxEntriesPerContract?: number;
+  minEntriesPerContract?: number;
 
   constructor(cacheOptions: RedisCacheOptions) {
     this.prefix = cacheOptions.prefix;
@@ -38,7 +38,6 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
     if (res !== null) {
       result = JSON.parse(res) as V;
     }
-
     // return a sortKeyCacheResult, or null
     if (result) {
       return {
@@ -76,12 +75,10 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
         offset: 0,
       },
     });
-
     if (result.length) {
       if (!result[0].startsWith(key)) {
         return null;
       }
-
       // get
       const value = await this.client.get(`${this.prefix}.${result[0]}`);
       return {
@@ -104,9 +101,30 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
     // put value
     await this.client.set(`${this.prefix}.${cacheKey.key}|${cacheKey.sortKey}`, JSON.stringify(value));
     await this.client.ZADD(`${this.prefix}.keys`, [{ score: 0, value: `${cacheKey.key}|${cacheKey.sortKey}` }]);
+    // get total count of keys
+    const count = await this.client.ZLEXCOUNT(
+      `${this.prefix}.keys`,
+      `[${cacheKey.key}|${genesisSortKey}`,
+      `[${cacheKey.key}|${cacheKey.sortKey}`
+    );
 
-    // get total count
-    // TODO
+    // if count is greater than maxEntriesPerContract, remove oldest entries amounting to (count - minEntriesPerContract)
+    if (this.maxEntriesPerContract && this.minEntriesPerContract && count > this.maxEntriesPerContract) {
+      const keysToRemove = await this.client.ZRANGE(
+        `${this.prefix}.keys`,
+        `[${cacheKey.key}|${genesisSortKey}`,
+        `[${cacheKey.key}|${cacheKey.sortKey}`,
+        {
+          BY: "LEX",
+          LIMIT: {
+            count: count - this.minEntriesPerContract,
+            offset: 0,
+          },
+        }
+      );
+      await this.client.ZREM(`${this.prefix}.keys`, keysToRemove);
+      await this.client.del(keysToRemove.map((k) => `${this.prefix}.${k}`));
+    }
   }
 
   /**
@@ -143,7 +161,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    * @returns an array of SortKey's
    */
   async keys(): Promise<string[]> {
-    const result = await this.client.ZRANGE(`${this.prefix}.keys`, `-`, "+", {
+    const result = await this.client.ZRANGE(`${this.prefix}.keys`, "-", "+", {
       BY: "LEX",
     });
     return result.map((v) => v.split("|")[1]);
@@ -151,14 +169,36 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async prune(entriesStored = 1): Promise<PruneStats | null> {
-    // get keys
-    throw new Error("prune not implemented yet");
-    return {
-      entriesBefore: 0,
-      entriesAfter: 0,
-      sizeBefore: 0,
-      sizeAfter: 0,
-    };
+    // //leaves n-latest (i.e. with latest (in lexicographic order) sort keys) entries for each cached key
+    // const keys = await this.client.ZRANGE(`${this.prefix}.keys`, '-', '+', {
+    //   BY: 'LEX',
+    // });
+    // const keysToPrune = keys.map(v => v.split('|')[0].split('.')[0]);
+    // // remove duplicates with filter
+    // const uniqueKeysToPrune = keysToPrune.filter((v, i, a) => a.indexOf(v) === i);
+    // for (const key of uniqueKeysToPrune) {
+    //   const keysToRemove = await this.client.ZRANGE(
+    //     `${this.prefix}.keys`,
+    //     `[${key}|${genesisSortKey}`,
+    //     `[${key}|${lastPossibleSortKey}`,
+    //     {
+    //       BY: 'LEX',
+    //       LIMIT: {
+    //         count: entriesStored,
+    //         offset: 0,
+    //       },
+    //     }
+    //   );
+    //   await this.client.ZREM(`${this.prefix}.keys`, keysToRemove);
+    //   await this.client.del(keysToRemove.map(k => `${this.prefix}.${k}`));
+    // }
+    return null;
+    // return {
+    //   entriesBefore: 0,
+    //   entriesAfter: 0,
+    //   sizeBefore: 0,
+    //   sizeAfter: 0,
+    // };
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -183,13 +223,13 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
 
   // TODO: has issues when used concurrently
   async open(): Promise<void> {
-    // try {
-    //   if (!this.client.isOpen) {
-    //     await this.client.connect();
-    //   }
-    // } catch (err) {
-    //   this.logger.error("Could not open Redis.", err);
-    // }
+    try {
+      if (!this.client.isOpen) {
+        await this.client.connect();
+      }
+    } catch (err) {
+      this.logger.error("Could not open Redis.", err);
+    }
   }
 
   storage<S>() {
