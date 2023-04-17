@@ -1,6 +1,6 @@
 # Warp Contracts Redis Cache
 
-Warp Contracts implementation of the `SortKeyCache` using [Redis](https://redis.io/). To learn more about `SortKey`'s, see [Warp docs](https://academy.warp.cc/docs/sdk/advanced/bundled-interaction#how-it-works).
+Warp Contracts implementation of the [SortKeyCache](https://github.com/warp-contracts/warp/blob/main/src/cache/SortKeyCache.ts) using [Redis](https://redis.io/). To learn more about `SortKey`'s, see [Warp docs](https://academy.warp.cc/docs/sdk/advanced/bundled-interaction#how-it-works) or check out [KV class](https://github.com/warp-contracts/warp/blob/main/src/legacy/smartweave-global.ts#L260) of SmartWeave global object.
 
 ## Installation
 
