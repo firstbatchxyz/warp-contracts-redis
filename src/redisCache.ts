@@ -361,27 +361,31 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
     }
   }
 
-  // TODO: has issues when used concurrently?
-  async close(): Promise<void> {
-    // try {
-    //   if (this.client.isOpen) {
-    //     await this.client.disconnect();
-    //     this.logger.info("Disconnected from Redis");
-    //   }
-    // } catch (err) {
-    //   this.logger.error("Could not close Redis.", err);
-    // }
-  }
-
-  // TODO: has issues when used concurrently?
+  /**
+   * Calls `connect` function of Redis client.
+   */
   async open(): Promise<void> {
     try {
       if (!this.client.isOpen) {
         await this.client.connect();
-        this.logger.info("Connected to Redis");
+        this.logger.info("Connected to Redis.");
       }
     } catch (err) {
       this.logger.error("Could not open Redis.", err);
+    }
+  }
+
+  /**
+   * Calls `disconnect` function of Redis client.
+   */
+  async close(): Promise<void> {
+    try {
+      if (this.client.isOpen) {
+        await this.client.disconnect();
+        this.logger.info("Disconnected from Redis.");
+      }
+    } catch (err) {
+      this.logger.error("Could not close Redis.", err);
     }
   }
 
