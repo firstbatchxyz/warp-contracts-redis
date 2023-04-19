@@ -5,13 +5,13 @@ import { globals } from "../jest.config.cjs";
 jest.setTimeout(100 * 1000);
 
 describe("crud operations", () => {
-  let db: RedisCache;
+  let db: RedisCache<number>;
 
   beforeAll(async () => {
     const redisClient = createClient({
       url: globals.__REDIS_URL__,
     });
-    db = new RedisCache({
+    db = new RedisCache<number>({
       prefix: "wcr-crud-test",
       minEntriesPerContract: 10,
       maxEntriesPerContract: 100,
