@@ -1,10 +1,11 @@
-import { createClient } from "redis";
+import { createClient } from "@redis/client";
 
-type RedisClient = ReturnType<typeof createClient>;
+export type RedisClient = ReturnType<typeof createClient>;
 
 export type RedisCacheOptions = {
   prefix: string;
   client: RedisClient;
   maxEntriesPerContract?: number;
   minEntriesPerContract?: number;
+  allowAtomics?: boolean;
 };

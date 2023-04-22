@@ -1,2 +1,2 @@
 export { RedisCache } from "./redisCache";
-export type { RedisCacheOptions } from "./types/redisCache";
+export type { RedisCacheOptions, RedisClient } from "./types/redisCache";

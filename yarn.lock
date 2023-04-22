@@ -670,12 +670,7 @@
     "@nodelib/fs.scandir" "2.1.5"
     fastq "^1.6.0"
 
-"@redis/bloom@1.2.0":
-  version "1.2.0"
-  resolved "https://registry.yarnpkg.com/@redis/bloom/-/bloom-1.2.0.tgz#d3fd6d3c0af3ef92f26767b56414a370c7b63b71"
-  integrity sha512-HG2DFjYKbpNmVXsa0keLHp/3leGJz1mjh09f2RLGGLQZzSHpkmZWuwJbAvo3QcRY8p80m5+ZdXZdYOSBLlp7Cg==
-
-"@redis/client@1.5.6":
+"@redis/client@^1.5.6":
   version "1.5.6"
   resolved "https://registry.yarnpkg.com/@redis/client/-/client-1.5.6.tgz#869cc65718d7d5493ef655a71dc40f3bc64a1b28"
   integrity sha512-dFD1S6je+A47Lj22jN/upVU2fj4huR7S9APd7/ziUXsIXDL+11GPYti4Suv5y8FuXaN+0ZG4JF+y1houEJ7ToA==
@@ -683,26 +678,6 @@
     cluster-key-slot "1.1.2"
     generic-pool "3.9.0"
     yallist "4.0.0"
-
-"@redis/graph@1.1.0":
-  version "1.1.0"
-  resolved "https://registry.yarnpkg.com/@redis/graph/-/graph-1.1.0.tgz#cc2b82e5141a29ada2cce7d267a6b74baa6dd519"
-  integrity sha512-16yZWngxyXPd+MJxeSr0dqh2AIOi8j9yXKcKCwVaKDbH3HTuETpDVPcLujhFYVPtYrngSco31BUcSa9TH31Gqg==
-
-"@redis/json@1.0.4":
-  version "1.0.4"
-  resolved "https://registry.yarnpkg.com/@redis/json/-/json-1.0.4.tgz#f372b5f93324e6ffb7f16aadcbcb4e5c3d39bda1"
-  integrity sha512-LUZE2Gdrhg0Rx7AN+cZkb1e6HjoSKaeeW8rYnt89Tly13GBI5eP4CwDVr+MY8BAYfCg4/N15OUrtLoona9uSgw==
-
-"@redis/search@1.1.2":
-  version "1.1.2"
-  resolved "https://registry.yarnpkg.com/@redis/search/-/search-1.1.2.tgz#6a8f66ba90812d39c2457420f859ce8fbd8f3838"
-  integrity sha512-/cMfstG/fOh/SsE+4/BQGeuH/JJloeWuH+qJzM8dbxuWvdWibWAOAHHCZTMPhV3xIlH4/cUEIA8OV5QnYpaVoA==
-
-"@redis/time-series@1.0.4":
-  version "1.0.4"
-  resolved "https://registry.yarnpkg.com/@redis/time-series/-/time-series-1.0.4.tgz#af85eb080f6934580e4d3b58046026b6c2b18717"
-  integrity sha512-ThUIgo2U/g7cCuZavucQTQzA9g9JbDDY2f64u3AbAoz/8vE2lt2U37LamDUVChhaDA3IRT9R6VvJwqnUfTJzng==
 
 "@sinclair/typebox@^0.24.1":
   version "0.24.51"
@@ -3328,18 +3303,6 @@ readdirp@~3.5.0:
   dependencies:
     picomatch "^2.2.1"
 
-redis@^4.6.4:
-  version "4.6.5"
-  resolved "https://registry.yarnpkg.com/redis/-/redis-4.6.5.tgz#f32fbde44429e96f562bb0c9b1db0143ab8cfa4f"
-  integrity sha512-O0OWA36gDQbswOdUuAhRL6mTZpHFN525HlgZgDaVNgCJIAZR3ya06NTESb0R+TUZ+BFaDpz6NnnVvoMx9meUFg==
-  dependencies:
-    "@redis/bloom" "1.2.0"
-    "@redis/client" "1.5.6"
-    "@redis/graph" "1.1.0"
-    "@redis/json" "1.0.4"
-    "@redis/search" "1.1.2"
-    "@redis/time-series" "1.0.4"
-
 regexpp@^3.1.0:
   version "3.2.0"
   resolved "https://registry.yarnpkg.com/regexpp/-/regexpp-3.2.0.tgz#0425a2768d8f23bad70ca4b90461fa2f1213e1b2"
@@ -3818,10 +3781,10 @@ walker@^1.0.8:
   dependencies:
     makeerror "1.0.12"
 
-warp-contracts@^1.4.1:
-  version "1.4.1"
-  resolved "https://registry.yarnpkg.com/warp-contracts/-/warp-contracts-1.4.1.tgz#ba4c0101eda170fe54c3bbfdd836252817786f72"
-  integrity sha512-NQE83O6waKKIH74oBoBITK5KQrA60WurnCFx4LCZ5tUSX683lodCHPeNbyuioFUBebfEULQRfUkcbmnCiKxoaA==
+warp-contracts@^1.4.2:
+  version "1.4.2"
+  resolved "https://registry.yarnpkg.com/warp-contracts/-/warp-contracts-1.4.2.tgz#d8fb1da5fa1ea1da2dd83052b7a2e24170fefb2e"
+  integrity sha512-YCZNT2rzODy9gcSAOXC6j4PWGlxA9oCV/Gydkcoz4VK2OXwo05P7bzqyatWBIb/oHcYqN0dcEBDc+XWqJdlo2Q==
   dependencies:
     "@idena/vrf-js" "^1.0.1"
     archiver "^5.3.0"

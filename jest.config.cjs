@@ -1,3 +1,4 @@
+/** @type {import('jest').Config} */
 // eslint-disable-next-line no-undef
 module.exports = {
   clearMocks: true,
@@ -8,7 +9,6 @@ module.exports = {
   transform: {
     "^.+\\.(ts|js)$": "ts-jest",
   },
-  globals: {
-    __REDIS_URL__: "redis://default:redispw@localhost:6379",
-  },
+  // do this to always show a summary of failed tests, even if there is only one
+  // reporters: [["default", { summaryThreshold: 1 }]],
 };
