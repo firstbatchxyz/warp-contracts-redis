@@ -28,3 +28,5 @@ bundles/
 .secrets
 
 cache
+
+dump.rdb
