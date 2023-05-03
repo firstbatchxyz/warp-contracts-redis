@@ -24,7 +24,9 @@
     "blockchain",
     "arweave",
     "smartweave",
-    "warp-contracts"
+    "warp-contracts",
+    "redis",
+    "cache"
   ],
   "scripts": {
     "build:cjs": "tsc -b tsconfig.json",

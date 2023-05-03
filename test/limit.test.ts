@@ -1,11 +1,11 @@
-import { createClient } from "@redis/client";
-import { RedisCache, RedisClient } from "../src";
+import type { RedisClientType } from "@redis/client";
+import { RedisCache } from "../src";
 import { getSortKey, makeValue } from "./utils";
 import constants from "./constants";
 
 jest.setTimeout(100 * 1000);
 
-describe.each<boolean>([true, false])("redis cache puts with limit", (isAtomic) => {
+describe.each<boolean>([true, false])("redis cache puts with limit (atomic: %s)", (isAtomic) => {
   let db: RedisCache<number>;
   const MIN_ENTRIES = 5;
   const MAX_ENTRIES = 10;
@@ -13,18 +13,19 @@ describe.each<boolean>([true, false])("redis cache puts with limit", (isAtomic) 
 
   beforeAll(async () => {
     expect(MIN_ENTRIES).toBeLessThan(MAX_ENTRIES);
-
-    const redisClient: RedisClient = createClient({
-      url: constants.REDIS_URL,
-    });
-    db = new RedisCache<number>({
-      prefix: constants.DBNAME,
-      minEntriesPerContract: MIN_ENTRIES,
-      maxEntriesPerContract: MAX_ENTRIES,
-      allowAtomics: true,
-      client: redisClient,
-    });
-    await db.open();
+    db = new RedisCache<number>(
+      {
+        inMemory: true,
+        dbLocation: constants.DBNAME,
+        subLevelSeparator: "|",
+      },
+      {
+        minEntriesPerContract: MIN_ENTRIES,
+        maxEntriesPerContract: MAX_ENTRIES,
+        isAtomic,
+        url: constants.REDIS_URL,
+      }
+    );
   });
 
   it("should put cache keys", async () => {
@@ -82,7 +83,7 @@ describe.each<boolean>([true, false])("redis cache puts with limit", (isAtomic) 
 
   afterAll(async () => {
     // clean everything
-    await db.storage<RedisClient>().FLUSHDB();
+    await db.storage<RedisClientType>().FLUSHDB();
 
     // need to wait a bit otherwise you get `DisconnectsClientError` error
     await new Promise((res) => {

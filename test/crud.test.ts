@@ -1,5 +1,5 @@
-import { createClient } from "@redis/client";
-import { RedisCache, RedisClient } from "../src";
+import type { RedisClientType } from "@redis/client";
+import { RedisCache } from "../src";
 import { getSortKey, makeValue } from "./utils";
 import constants from "./constants";
 
@@ -11,17 +11,19 @@ describe("redis cache CRUD operations", () => {
   const key = "crudtest";
 
   beforeAll(async () => {
-    const redisClient: RedisClient = createClient({
-      url: constants.REDIS_URL,
-    });
-    db = new RedisCache<number>({
-      prefix: constants.DBNAME,
-      minEntriesPerContract: 10,
-      maxEntriesPerContract: 100,
-      allowAtomics: true,
-      client: redisClient,
-    });
-    await db.open();
+    db = new RedisCache<number>(
+      {
+        inMemory: false,
+        dbLocation: constants.DBNAME,
+        subLevelSeparator: "|",
+      },
+      {
+        minEntriesPerContract: 10,
+        maxEntriesPerContract: 100,
+        isAtomic: false,
+        url: constants.REDIS_URL,
+      }
+    );
   });
 
   it("should get & set keys", async () => {
@@ -69,7 +71,7 @@ describe("redis cache CRUD operations", () => {
 
   afterAll(async () => {
     // clean everything
-    await db.storage<RedisClient>().FLUSHDB();
+    await db.storage<RedisClientType>().FLUSHDB();
 
     // need to wait a bit otherwise you get `DisconnectsClientError` error
     await new Promise((res) => {

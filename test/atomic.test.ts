@@ -1,5 +1,5 @@
-import { createClient } from "@redis/client";
-import { RedisCache, RedisClient } from "../src";
+import type { RedisClientType } from "@redis/client";
+import { RedisCache } from "../src";
 import { getSortKey, makeValue } from "./utils";
 import constants from "./constants";
 
@@ -11,17 +11,19 @@ describe("redis cache atomic transactions", () => {
   const MAX_ENTRIES = 10;
 
   beforeAll(async () => {
-    const redisClient: RedisClient = createClient({
-      url: constants.REDIS_URL,
-    });
-    db = new RedisCache<number>({
-      prefix: constants.DBNAME,
-      minEntriesPerContract: MIN_ENTRIES,
-      maxEntriesPerContract: MAX_ENTRIES,
-      allowAtomics: true,
-      client: redisClient,
-    });
-    await db.open();
+    db = new RedisCache(
+      {
+        inMemory: true,
+        dbLocation: constants.DBNAME,
+        subLevelSeparator: "|",
+      },
+      {
+        minEntriesPerContract: MIN_ENTRIES,
+        maxEntriesPerContract: MAX_ENTRIES,
+        isAtomic: true,
+        url: constants.REDIS_URL,
+      }
+    );
   });
 
   it("should begin & commit a transaction", async () => {
@@ -95,7 +97,7 @@ describe("redis cache atomic transactions", () => {
 
   afterAll(async () => {
     // clean everything
-    await db.storage<RedisClient>().FLUSHDB();
+    await db.storage<RedisClientType>().FLUSHDB();
 
     // need to wait a bit otherwise you get `DisconnectsClientError` error
     await new Promise((res) => {
