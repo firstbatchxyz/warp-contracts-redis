@@ -28,7 +28,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
   isAtomic: boolean;
 
   constructor(cacheOptions: CacheOptions, redisOptions: RedisOptions) {
-    // open client
+    // create client
     if (redisOptions.client) {
       // client is managed from outside
       this.client = redisOptions.client;
@@ -43,12 +43,17 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
 
     // open client and set config
     this.open().then(() => {
-      if (cacheOptions.inMemory) {
-        // see: How to disable Redis RDB and AOF? https://stackoverflow.com/a/34736871/21699616
-        // https://redis.io/docs/management/persistence/#append-only-file
-        this.client.CONFIG_SET("appendonly", "no");
-        // https://redis.io/docs/management/persistence/#snapshotting
-        this.client.CONFIG_SET("save", "");
+      if (this.isManaged) {
+        // cant change config settings if client is not managed by Warp
+        this.logger.warn("Client is managed by user, not changing config.");
+      } else {
+        if (cacheOptions.inMemory) {
+          // see: How to disable Redis RDB and AOF? https://stackoverflow.com/a/34736871/21699616
+          // https://redis.io/docs/management/persistence/#append-only-file
+          this.client.CONFIG_SET("appendonly", "no");
+          // https://redis.io/docs/management/persistence/#snapshotting
+          this.client.CONFIG_SET("save", "");
+        }
       }
     });
 
