@@ -22,27 +22,38 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
   transaction: ReturnType<typeof this.client.MULTI> | null = null;
   maxEntriesPerContract?: number;
   minEntriesPerContract?: number;
+  isManaged: boolean;
 
   // temporary fix, will remove
   isAtomic: boolean;
 
-  // temporary fix, will remove
-  isManaged: boolean;
-
   constructor(cacheOptions: CacheOptions, redisOptions: RedisOptions) {
-    // open client
-    this.client = createClient({
-      url: redisOptions.url,
-    });
+    // create client
+    if (redisOptions.client) {
+      // client is managed from outside
+      this.client = redisOptions.client;
+      this.isManaged = true;
+    } else {
+      // client is managed by Warp
+      this.client = createClient({
+        url: redisOptions.url,
+      });
+      this.isManaged = false;
+    }
 
     // open client and set config
     this.open().then(() => {
-      if (cacheOptions.inMemory) {
-        // see: How to disable Redis RDB and AOF? https://stackoverflow.com/a/34736871/21699616
-        // https://redis.io/docs/management/persistence/#append-only-file
-        this.client.CONFIG_SET("appendonly", "no");
-        // https://redis.io/docs/management/persistence/#snapshotting
-        this.client.CONFIG_SET("save", "");
+      if (this.isManaged) {
+        // cant change config settings if client is not managed by Warp
+        this.logger.warn("Client is managed by user, not changing config.");
+      } else {
+        if (cacheOptions.inMemory) {
+          // see: How to disable Redis RDB and AOF? https://stackoverflow.com/a/34736871/21699616
+          // https://redis.io/docs/management/persistence/#append-only-file
+          this.client.CONFIG_SET("appendonly", "no");
+          // https://redis.io/docs/management/persistence/#snapshotting
+          this.client.CONFIG_SET("save", "");
+        }
       }
     });
 
@@ -105,7 +116,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    * the underlying client is returned (which makes this call equivalent of `this.client`).
    * @returns client or transaction
    */
-  private asAtomic(): typeof this.client | typeof this.transaction {
+  private asAtomic(): RedisClientType | typeof this.transaction {
     return this.transaction || this.client;
   }
 
