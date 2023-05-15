@@ -22,18 +22,24 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
   transaction: ReturnType<typeof this.client.MULTI> | null = null;
   maxEntriesPerContract?: number;
   minEntriesPerContract?: number;
+  isManaged: boolean;
 
   // temporary fix, will remove
   isAtomic: boolean;
 
-  // temporary fix, will remove
-  isManaged: boolean;
-
   constructor(cacheOptions: CacheOptions, redisOptions: RedisOptions) {
     // open client
-    this.client = createClient({
-      url: redisOptions.url,
-    });
+    if (redisOptions.client) {
+      // client is managed from outside
+      this.client = redisOptions.client;
+      this.isManaged = true;
+    } else {
+      // client is managed by Warp
+      this.client = createClient({
+        url: redisOptions.url,
+      });
+      this.isManaged = false;
+    }
 
     // open client and set config
     this.open().then(() => {
@@ -105,7 +111,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    * the underlying client is returned (which makes this call equivalent of `this.client`).
    * @returns client or transaction
    */
-  private asAtomic(): typeof this.client | typeof this.transaction {
+  private asAtomic(): RedisClientType | typeof this.transaction {
     return this.transaction || this.client;
   }
 

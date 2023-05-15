@@ -1,13 +1,16 @@
+import type { RedisClientType } from "@redis/client";
+
 /**
  * Redis client options.
- * - `url`
+ * - `url` Redis URL
  * - `isAtomic` temporarily disables atomic operations
- * - `isManaged` temporarily disables atomic operations
+ * - `client` provide the RedisClient yourself, internally disables `open` and `close` calls
+ * and expects you to do them outside to your client manually.
  */
 export type RedisOptions = {
   url: string;
   maxEntriesPerContract?: number;
   minEntriesPerContract?: number;
   isAtomic?: boolean;
-  isManaged?: boolean;
+  client?: RedisClientType;
 };
