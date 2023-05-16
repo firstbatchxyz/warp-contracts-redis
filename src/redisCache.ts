@@ -31,14 +31,17 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    * Minimum number of `key|sortKey` pairs for each key to be kept upon pruning.
    */
   minEntriesPerContract: number;
-  /** if `true`, then it means `this.client` has been created outside, and this will further
+  /**
+   * If `true`, then it means `this.client` has been created outside, and this will further
    * disable `open` and `close` functions. As such, `this.isOpen` will also not be touched.
    */
   isManaged: boolean;
-  /** this is a temporary fix until atomicity is implemented in full, will remove in future */
+  /** This is a temporary fix until atomicity is implemented in full, will remove in future */
   isAtomic: boolean;
+  /** Underlying Redis client (from ioredis) */
   client: Redis;
-  transaction: ChainableCommander;
+  /** An active transaction object */
+  transaction: ChainableCommander | null = null;
 
   constructor(cacheOptions: CacheOptions, redisOptions: RedisOptions) {
     // create client
@@ -93,6 +96,8 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    */
   async begin(): Promise<void> {
     if (!this.isAtomic) return; // TODO remove
+
+    this.logger.debug("Beginning transaction.");
     if (this.transaction != null) {
       throw new Error("Already begun");
     }
@@ -105,6 +110,8 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    */
   async rollback(): Promise<void> {
     if (!this.isAtomic) return; // TODO remove
+
+    this.logger.debug("Rolling back transaction.");
     if (this.transaction === null) {
       throw new Error("No transaction");
     }
@@ -119,6 +126,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
   async commit(): Promise<void> {
     if (!this.isAtomic) return; // TODO remove
 
+    this.logger.debug("Committing to transaction.");
     if (this.transaction === null) {
       throw new Error("No transaction");
     }
@@ -288,6 +296,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    * @returns value, `null` if it does not exist in cache
    */
   async get(cacheKey: CacheKey): Promise<SortKeyCacheResult<V> | null> {
+    this.logger.debug(`GET ${cacheKey.key}\n(sortKey ${cacheKey.sortKey})`);
     const res = await this.client.get(`${this.prefix}.${cacheKey.key}${this.sls}${cacheKey.sortKey}`);
     if (res == null) {
       return null;
@@ -357,29 +366,32 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    */
   async put(cacheKey: CacheKey, value: V): Promise<void> {
     const { key, sortKey } = cacheKey;
+    this.logger.debug(`PUT ${key}\n(sortKey ${sortKey})`);
     await this.asAtomic().set(`${this.prefix}.${key}${this.sls}${sortKey}`, stringify(value));
 
     // it is very important to set the score 0 (first argument after key), otherwise lex ordering may break
     await this.asAtomic().zadd(`${this.prefix}.keys`, 0, `${key}${this.sls}${sortKey}`);
 
-    // TODO: this count may be wrong for atomic txs, will check!
+    // TODO: this count may be wrong for atomic txs, will fix
     const count = await this.client.zlexcount(
       `${this.prefix}.keys`,
       `[${key}${this.sls}${genesisSortKey}`,
       `[${key}${this.sls}${sortKey}`
     );
+
+    // if count is greater than maxEntriesPerContract, leave
     if (this.maxEntriesPerContract && this.minEntriesPerContract && count > this.maxEntriesPerContract) {
-      // if count is greater than maxEntriesPerContract, leave
       const numKeysToRemove = count - this.minEntriesPerContract - 1;
       // TODO: this check might be redundant
       if (numKeysToRemove > 1) {
+        this.logger.debug(`Removing ${numKeysToRemove} oldest for: ${key}`);
         const keysToRemove = await this.client.zrangebylex(
           `${this.prefix}.keys`,
           `[${key}${this.sls}${genesisSortKey}`,
           `[${key}${this.sls}${sortKey}`,
           "LIMIT",
           0,
-          count - this.minEntriesPerContract - 1
+          numKeysToRemove
         );
         await this.asAtomic().zrem(`${this.prefix}.keys`, keysToRemove);
         await this.asAtomic().del(keysToRemove.map((cacheKey) => `${this.prefix}.${cacheKey}`));
@@ -403,6 +415,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    * @param key key
    */
   async delete(key: string): Promise<void> {
+    this.logger.debug("DELETE " + key);
     const cacheKeysToRemove = await this.client.zrangebylex(
       `${this.prefix}.keys`,
       `[${key}${this.sls}${genesisSortKey}`,
@@ -415,7 +428,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
   /**
    * Prunes the cache so that only `n` latest sortKey's are left for each cached key
    * @param entriesStored how many latest entries should be left for each cached key
-   * @returns PruneStats; only the entry info is correct, not the sizes!
+   * @returns `PruneStats` but only the entry info is correct, not the sizes!
    */
   async prune(entriesStored = 1): Promise<PruneStats | null> {
     // make sure `entriesStored` is positive
@@ -423,10 +436,10 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
     if (!entriesStored || entriesStored <= 0) {
       entriesStored = 1;
     }
+    this.logger.debug(`PRUNE (leave ${entriesStored} entries)`);
+
     let entriesBefore = 0;
     let entriesAfter = 0;
-
-    // prune each key
     const keys = await this.getAllKeys();
     for (const key of keys) {
       const cacheKeys = await this.client.zrevrangebylex(
@@ -450,8 +463,8 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
     return {
       entriesBefore,
       entriesAfter,
-      sizeBefore: entriesBefore, // TODO: add size info
-      sizeAfter: entriesAfter, // TODO: add size info
+      sizeBefore: 0, // TODO: add size info
+      sizeAfter: 0, // TODO: add size info
     };
   }
 
@@ -466,7 +479,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
         !(this.client.status === "connecting" || this.client.status === "connect" || this.client.status === "ready")
       ) {
         await this.client.connect();
-        this.logger.info("Connected to Redis.");
+        this.logger.info("Connected.");
       }
     } catch (err) {
       this.logger.error("Could not open Redis.", err);
@@ -486,10 +499,10 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
           await this.rollback();
         }
         await this.client.quit();
-        this.logger.info("Disconnected from Redis.");
+        this.logger.info("Disconnected.");
       }
     } catch (err) {
-      this.logger.error("Could not close Redis.", err);
+      this.logger.error("Could not quit client.", err);
     }
   }
 
@@ -499,7 +512,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    * do this in production.
    */
   async dump() {
-    this.logger.warn("Dumping cache!");
+    this.logger.warn("Saving to disk...");
     const response = await this.client.save();
     // https://redis.io/commands/save/
     if (response !== "OK") {
