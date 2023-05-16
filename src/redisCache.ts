@@ -159,7 +159,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    * @param opStack a `BatchDBOp` object with `key` and operation `type`
    */
   async batch(opStack: BatchDBOp<V>[]) {
-    this.logger.debug("BATCH called.", { opStack });
+    this.logger.debug("BATCH called.");
     for (const op of opStack) {
       if (op.type === "put") {
         await this.put(op.key, op.value);
@@ -176,7 +176,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    * @param options
    */
   async keys(sortKey: string, options?: SortKeyCacheRangeOptions): Promise<string[]> {
-    this.logger.debug("KEYS (get all keys) called.", { sortKey, options });
+    this.logger.debug("KEYS called.", { sortKey, options });
     // prepare range arguments
     let limit: number | undefined = undefined;
     let isReverse = false;
@@ -436,7 +436,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    * @param key key
    */
   async delete(key: string): Promise<void> {
-    this.logger.debug("DELETE ALL called.", { key });
+    this.logger.debug("DELETE called.", { key });
     const cacheKeysToRemove = await this.client.zrangebylex(
       `${this.prefix}.keys`,
       `[${key}${this.sls}${genesisSortKey}`,
