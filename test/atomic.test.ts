@@ -1,4 +1,4 @@
-import type { RedisClientType } from "@redis/client";
+import type { Redis } from "ioredis";
 import { RedisCache } from "../src";
 import { getSortKey, makeValue } from "./utils";
 import constants from "./constants";
@@ -97,7 +97,7 @@ describe("redis cache atomic transactions", () => {
 
   afterAll(async () => {
     // clean everything
-    await db.storage<RedisClientType>().FLUSHDB();
+    await db.storage<Redis>().flushdb();
 
     // need to wait a bit otherwise you get `DisconnectsClientError` error
     await new Promise((res) => {

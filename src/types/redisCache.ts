@@ -1,4 +1,4 @@
-import type { RedisClientType } from "@redis/client";
+import type { Redis } from "ioredis";
 
 /**
  * Redis client options.
@@ -8,9 +8,9 @@ import type { RedisClientType } from "@redis/client";
  * and expects you to do them outside to your client manually.
  */
 export type RedisOptions = {
-  url: string;
+  url?: string;
   maxEntriesPerContract?: number;
   minEntriesPerContract?: number;
   isAtomic?: boolean;
-  client?: RedisClientType;
+  client?: Redis;
 };
