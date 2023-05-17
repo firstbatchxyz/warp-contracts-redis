@@ -84,7 +84,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
     this.maxEntriesPerContract = redisOptions.maxEntriesPerContract || 10;
     this.minEntriesPerContract = redisOptions.minEntriesPerContract || 10;
     this.isAtomic = redisOptions.isAtomic || false;
-    if (redisOptions.minEntriesPerContract > redisOptions.maxEntriesPerContract) {
+    if (this.minEntriesPerContract > this.maxEntriesPerContract) {
       throw new Error("minEntries > maxEntries");
     }
   }
@@ -408,7 +408,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
         const keysToRemove = await this.client.zrangebylex(
           `${this.prefix}.keys`,
           `[${key}${this.sls}${genesisSortKey}`,
-          `[${key}${this.sls}${sortKey}`,
+          `(${key}${this.sls}${sortKey}`,
           "LIMIT",
           0,
           numKeysToRemove
