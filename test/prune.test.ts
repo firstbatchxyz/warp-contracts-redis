@@ -1,4 +1,3 @@
-import type { Redis } from "ioredis";
 import { RedisCache } from "../src";
 import { getSortKey, makeValue } from "./utils";
 import constants from "./constants";
@@ -21,7 +20,6 @@ describe.each<boolean>([true, false])("redis cache prune (atomic: %s)", (isAtomi
       {
         minEntriesPerContract: 10,
         maxEntriesPerContract: 100,
-        isAtomic,
         url: constants.REDIS_URL,
       }
     );

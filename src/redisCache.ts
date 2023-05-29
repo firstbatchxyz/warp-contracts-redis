@@ -39,8 +39,6 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    * disable `open` and `close` functions. As such, `this.isOpen` will also not be touched.
    */
   isManaged: boolean;
-  /** TODO: This is a temporary fix until atomicity is implemented in full, will remove in future */
-  isAtomic: boolean;
   /** Underlying Redis client (from `ioredis`) */
   client: Redis;
   /**
@@ -86,7 +84,6 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
     // redis specific options
     this.maxEntriesPerContract = redisOptions.maxEntriesPerContract || 10;
     this.minEntriesPerContract = redisOptions.minEntriesPerContract || 10;
-    this.isAtomic = redisOptions.isAtomic || false;
     if (this.minEntriesPerContract > this.maxEntriesPerContract) {
       throw new Error("minEntries > maxEntries");
     }
@@ -131,11 +128,6 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    */
   async begin(): Promise<void> {
     this.logger.debug("BEGIN called.");
-    if (!this.isAtomic) {
-      this.logger.debug("Not atomic, skipping begin.");
-      return;
-    } // TODO remove
-
     if (this.transaction != null) {
       throw new Error("Already begun");
     }
@@ -148,11 +140,6 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    */
   async rollback(): Promise<void> {
     this.logger.debug("ROLLBACK called.");
-    if (!this.isAtomic) {
-      this.logger.debug("Not atomic, skipping rollback.");
-      return;
-    } // TODO remove
-
     if (this.transaction === null) {
       throw new Error("No transaction");
     }
@@ -166,11 +153,6 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    */
   async commit(): Promise<void> {
     this.logger.debug("COMMIT called.");
-    if (!this.isAtomic) {
-      this.logger.debug("Not atomic, skipping commit.");
-      return;
-    } // TODO remove
-
     if (this.transaction === null) {
       throw new Error("No transaction");
     }
@@ -189,7 +171,6 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
 
   /**
    * Executes a list of operations in batch.
-   * @todo can use `Promise.all` here
    * @param opStack a `BatchDBOp` object with `key` and operation `type`
    */
   async batch(opStack: BatchDBOp<V>[]) {
@@ -518,8 +499,6 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
 
 /**
  * Client values must be wrapped with this class in KV.
- * @todo this should probably be exported from warp in the future
- * @todo no values are wrapped yet, check after testing
  */
 // class ClientValueWrapper<V> {
 //   constructor(readonly value: V, readonly tomb: boolean = false) {}

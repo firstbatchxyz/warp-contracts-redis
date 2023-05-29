@@ -1,4 +1,3 @@
-import type { Redis } from "ioredis";
 import { RedisCache } from "../src";
 import { getSortKey, makeValue } from "./utils";
 import constants from "./constants";
@@ -20,7 +19,6 @@ describe.each<boolean>([true, false])("redis cache puts with limit (atomic: %s)"
       {
         minEntriesPerContract: MIN_ENTRIES,
         maxEntriesPerContract: MAX_ENTRIES,
-        isAtomic,
         url: constants.REDIS_URL,
       }
     );
@@ -83,7 +81,7 @@ describe.each<boolean>([true, false])("redis cache puts with limit (atomic: %s)"
 
   afterAll(async () => {
     // clean everything
-    await db.storage<Redis>().flushdb();
+    await db.storage().flushdb();
 
     // need to wait a bit otherwise you get `DisconnectsClientError` error
     await new Promise((res) => {
