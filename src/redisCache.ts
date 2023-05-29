@@ -113,7 +113,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
   }
 
   /**
-   *
+   * Defines the Lua scripts needed by RedisCache to the provided client.
    * @param client redis client that is connected
    */
   static defineLuaScripts(client: Redis) {
