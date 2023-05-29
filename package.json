@@ -6,6 +6,7 @@
   "main": "./lib/cjs/index.js",
   "license": "MIT",
   "author": "FirstBatch Team <dev@firstbatch.xyz>",
+  "homepage": "https://github.com/firstbatchxyz/warp-contracts-redis#readme",
   "contributors": [
     "Faruk Can Özkan <farukcan@firstbatch.xyz>",
     "Erhan Tezcan <erhan@firstbatch.xyz>"
