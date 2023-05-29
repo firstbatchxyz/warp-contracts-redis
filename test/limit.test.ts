@@ -45,7 +45,7 @@ describe.each<boolean>([true, false])("redis cache puts with limit (atomic: %s)"
         expect(result.sortKey).toBe(getSortKey(i));
         expect(result.cachedValue).toBe(makeValue(i));
       } else {
-        fail("expected a result");
+        expect(result).not.toBe(null);
       }
     }
   });
@@ -72,7 +72,7 @@ describe.each<boolean>([true, false])("redis cache puts with limit (atomic: %s)"
         expect(result.sortKey).toBe(getSortKey(i));
         expect(result.cachedValue).toBe(makeValue(i));
       } else {
-        fail("expected a result");
+        expect(result).not.toBe(null);
       }
     }
 

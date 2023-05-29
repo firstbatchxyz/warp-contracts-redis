@@ -3,7 +3,7 @@ import { RedisCache } from "../src";
 import { getSortKey, makeValue } from "./utils";
 import constants from "./constants";
 
-jest.setTimeout(100 * 1000);
+jest.setTimeout(100_000);
 
 describe("redis cache CRUD operations", () => {
   let db: RedisCache<number>;
@@ -37,7 +37,7 @@ describe("redis cache CRUD operations", () => {
         expect(result.sortKey).toBe(getSortKey(i));
         expect(result.cachedValue).toBe(makeValue(i));
       } else {
-        fail("expected a result");
+        expect(result).not.toBe(null);
       }
     }
   });
@@ -53,20 +53,42 @@ describe("redis cache CRUD operations", () => {
       expect(result.sortKey).toBe(getSortKey(LAST_HEIGHT));
       expect(result.cachedValue).toBe(makeValue(LAST_HEIGHT));
     } else {
-      fail("expected a result");
+      expect(result).not.toBe(null);
     }
   });
 
-  it("should delete keys", async () => {
-    await db.delete(key);
+  it("should delete keys properly", async () => {
+    const delHeight = 2;
 
-    for (let i = 1; i <= LAST_HEIGHT; i++) {
+    await db.del({ key, sortKey: getSortKey(delHeight) });
+
+    // lower sortKey's should be accessible alright
+    for (let i = 1; i < delHeight; i++) {
+      const result = await db.get({ key, sortKey: getSortKey(i) });
+      if (result) {
+        expect(result.sortKey).toBe(getSortKey(i));
+        expect(result.cachedValue).toBe(makeValue(i));
+      } else {
+        expect(result).not.toBe(null);
+      }
+    }
+
+    // greater-equal sortKey's should be gone
+    for (let i = delHeight; i <= LAST_HEIGHT; i++) {
       const result = await db.get({ key, sortKey: getSortKey(i) });
       expect(result).toBe(null);
     }
 
-    expect(await db.getLast(key)).toBe(null);
-    expect(await db.keys(getSortKey(LAST_HEIGHT))).toStrictEqual([]);
+    // getLast should return the latest sortKey before the deleted one
+    {
+      const result = await db.getLast(key);
+      if (result) {
+        expect(result.sortKey).toBe(getSortKey(delHeight - 1));
+        expect(result.cachedValue).toBe(makeValue(delHeight - 1));
+      } else {
+        expect(result).not.toBe(null);
+      }
+    }
   });
 
   afterAll(async () => {

@@ -66,7 +66,7 @@ describe.each<boolean>([true, false])("redis cache prune (atomic: %s)", (isAtomi
           expect(result.sortKey).toBe(getSortKey(i));
           expect(result.cachedValue).toBe(makeValue(i));
         } else {
-          fail("expected a result");
+          expect(result).not.toBe(null);
         }
       }
     }

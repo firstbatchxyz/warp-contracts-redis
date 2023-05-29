@@ -309,7 +309,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    * @returns value, `null` if it does not exist in cache
    */
   async get(cacheKey: CacheKey): Promise<SortKeyCacheResult<V> | null> {
-    this.logger.debug(`GET called.`, { cacheKey });
+    this.logger.debug(`GET called.`, cacheKey);
 
     const res = await this.client.get(`${this.prefix}.${cacheKey.key}${this.sls}${cacheKey.sortKey}`);
     if (res == null) {
@@ -386,7 +386,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    */
   async put(cacheKey: CacheKey, value: V): Promise<void> {
     const { key, sortKey } = cacheKey;
-    this.logger.debug("PUT called.", { cacheKey });
+    this.logger.debug("PUT called.", cacheKey);
     await this.asAtomic().set(`${this.prefix}.${key}${this.sls}${sortKey}`, stringify(value));
 
     // it is very important to set the score 0 (first argument after key), otherwise lex ordering may break
@@ -421,29 +421,32 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
 
   //////////////////// DEL FUNCTIONS ////////////////////
   /**
-   * Deletes only a specific `sortKey` for some `key`.
+   * Deletes keys are not below a given `sortKey` for some `key`.
+   * Values below that `sortKey` should still be accessible.
    * @param cacheKey a key and sortKey
    */
   async del(cacheKey: CacheKey): Promise<void> {
-    this.logger.debug("DEL called.", { cacheKey });
-    await this.asAtomic().del(`${this.prefix}.${cacheKey.key}${this.sls}${cacheKey.sortKey}`);
+    this.logger.debug("DEL called.", cacheKey);
+    const cacheKeysToRemove = await this.client.zrangebylex(
+      `${this.prefix}.keys`,
+      `[${cacheKey.key}${this.sls}${cacheKey.sortKey}`,
+      `[${cacheKey.key}${this.sls}${lastPossibleSortKey}`
+    );
+    await this.asAtomic().zrem(`${this.prefix}.keys`, cacheKeysToRemove);
+    await this.asAtomic().del(cacheKeysToRemove.map((cacheKey) => `${this.prefix}.${cacheKey}`));
   }
 
   /**
    * Removes all data at the given key.
-   * This means finding all `sortKey`s associated with this data,
-   * and removing all of them.
+   *
+   * This means finding all `sortKey`s associated with this data and removing all of them.
+   * Internally calls `del` with the `genesisSortKey` as the argument.
+   * @see {@link del}
    * @param key key
    */
   async delete(key: string): Promise<void> {
     this.logger.debug("DELETE called.", { key });
-    const cacheKeysToRemove = await this.client.zrangebylex(
-      `${this.prefix}.keys`,
-      `[${key}${this.sls}${genesisSortKey}`,
-      `[${key}${this.sls}${lastPossibleSortKey}`
-    );
-    await this.asAtomic().zrem(`${this.prefix}.keys`, cacheKeysToRemove);
-    await this.asAtomic().del(cacheKeysToRemove.map((cacheKey) => `${this.prefix}.${cacheKey}`));
+    await this.del({ key, sortKey: genesisSortKey });
   }
 
   /**
