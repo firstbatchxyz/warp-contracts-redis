@@ -1,18 +1,17 @@
--- find the keys to remove
+local key = KEYS[1]
+local sortKey = KEYS[2]
+local prefix = ARGV[1]
+local sls = ARGV[2]
+
 local cacheKeysToRemove = redis.call(
-  "ZRANGEBYLEX",
-  "__PFX__.keys",
-  "[" .. KEYS[1] .. "__SLS__" .. KEYS[2],
-  "[" .. KEYS[1] .. "__SLS____LPSK__"
+  "ZRANGE",
+  prefix .. ".keys",
+  "[" .. key .. sls .. sortKey,
+  "(" .. key .. sls .. "999999999999,9999999999999,zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+  "BYLEX"
 )
 
--- TODO: can this be done without a loop?
-for _, cacheKey in ipairs(cacheKeysToRemove) do
-  -- remove key from sorted set
-  redis.call("ZREM", "__PFX__.keys", cacheKey)
-  -- remove key itself
-  redis.call("DEL", "__PFX__." .. cacheKey)
+redis.call("ZREM", prefix .. ".keys", unpack(cacheKeysToRemove))
+for _, cacheKey in pairs(cacheKeysToRemove) do
+  redis.call("DEL", prefix .. "." .. cacheKey)
 end
-
--- returns the number of keys to be removed
-return #cacheKeysToRemove

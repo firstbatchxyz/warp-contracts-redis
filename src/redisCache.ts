@@ -9,12 +9,13 @@ import {
   lastPossibleSortKey,
   CacheOptions,
 } from "warp-contracts";
+import type { SortKeyCacheRangeOptions } from "warp-contracts/lib/types/cache/SortKeyCacheRangeOptions";
 import { Redis } from "ioredis";
 import type { ChainableCommander } from "ioredis";
-import type { RedisOptions } from "types/redisCache";
-import type { SortKeyCacheRangeOptions } from "warp-contracts/lib/types/cache/SortKeyCacheRangeOptions";
 import stringify from "safe-stable-stringify";
-import { LuaScriptBuilder } from "./luaScripts";
+
+import { luaScripts } from "./luaScripts";
+import type { RedisOptions } from "./types/redisCache";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export class RedisCache<V = any> implements SortKeyCache<V> {
@@ -55,7 +56,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
       this.client = redisOptions.client;
       this.isManaged = true;
     } else if (redisOptions.url) {
-      // client is managed by Warp
+      // client is managed from inside
       this.client = new Redis(redisOptions.url, {
         lazyConnect: true, // disables auto-connect on client instantiation
       });
@@ -91,7 +92,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
     }
 
     // define lua scripts
-    RedisCache.defineLuaScripts(this.client, this.prefix, this.sls);
+    RedisCache.defineLuaScripts(this.client);
   }
 
   /**
@@ -118,9 +119,8 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    *
    * @param client redis client that is connected
    */
-  static defineLuaScripts(client: Redis, prefix: string, subLevelSeparator: string) {
-    const luaScripts = new LuaScriptBuilder(prefix, subLevelSeparator);
-    luaScripts.commands().forEach((command) => client.defineCommand(command[0], command[1]));
+  static defineLuaScripts(client: Redis) {
+    Object.entries(luaScripts).forEach(([name, definition]) => client.defineCommand(name, definition));
   }
 
   //////////////////// TRANSACTION LOGIC ////////////////////
@@ -241,7 +241,6 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
 
     // get the latest `sortKey` for each `key`
     // which would be the first time it appears here in this sorted array
-    // TODO: we could use a Lua script for this entire thing
     const latestKeys = cacheKeys.reduce<{
       result: string[];
       prevKey: string;
@@ -292,20 +291,6 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    */
   private async getAllCacheKeys(): Promise<string[]> {
     return this.client.zrangebylex(`${this.prefix}.keys`, "-", "+");
-  }
-
-  /**
-   * Get all keys, without the prefix or the sortKey suffixes.
-   * It is not guaranteed that each returned key has an entry with
-   * the latest `sortKey`!
-   * @returns an array of keys
-   */
-  private async getAllKeys(): Promise<string[]> {
-    const cacheKeys = await this.getAllCacheKeys();
-    // map `key|sortKey` to `key` only
-    const keys = cacheKeys.map((v) => v.split(this.sls)[0]);
-    // unique keys only
-    return keys.filter((val, idx, arr) => arr.indexOf(val) === idx);
   }
 
   /**
@@ -421,38 +406,16 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    * @param value new value
    */
   async put(cacheKey: CacheKey, value: V): Promise<void> {
-    const { key, sortKey } = cacheKey;
     this.logger.debug("PUT called.", cacheKey);
-    await this.asAtomic().set(`${this.prefix}.${key}${this.sls}${sortKey}`, stringify(value));
-
-    // it is very important to set the score 0 (first argument after key), otherwise lex ordering may break
-    await this.asAtomic().zadd(`${this.prefix}.keys`, 0, `${key}${this.sls}${sortKey}`);
-
-    // TODO: this count may be wrong for atomic txs, will fix
-    const count = await this.client.zlexcount(
-      `${this.prefix}.keys`,
-      `[${key}${this.sls}${genesisSortKey}`,
-      `[${key}${this.sls}${sortKey}`
+    await this.asAtomic().atomic_put(
+      cacheKey.key,
+      cacheKey.sortKey,
+      stringify(value),
+      this.minEntriesPerContract,
+      this.maxEntriesPerContract,
+      this.prefix,
+      this.sls
     );
-
-    // if count is greater than maxEntriesPerContract, leave
-    if (this.maxEntriesPerContract && this.minEntriesPerContract && count > this.maxEntriesPerContract) {
-      const numKeysToRemove = count - this.minEntriesPerContract - 1;
-      // TODO: this check might be redundant
-      if (numKeysToRemove > 1) {
-        this.logger.debug(`Removing ${numKeysToRemove} oldest for: ${key}`);
-        const keysToRemove = await this.client.zrangebylex(
-          `${this.prefix}.keys`,
-          `[${key}${this.sls}${genesisSortKey}`,
-          `(${key}${this.sls}${sortKey}`,
-          "LIMIT",
-          0,
-          numKeysToRemove
-        );
-        await this.asAtomic().zrem(`${this.prefix}.keys`, keysToRemove);
-        await this.asAtomic().del(keysToRemove.map((cacheKey) => `${this.prefix}.${cacheKey}`));
-      }
-    }
   }
 
   //////////////////// DEL FUNCTIONS ////////////////////
@@ -463,7 +426,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    */
   async del(cacheKey: CacheKey): Promise<void> {
     this.logger.debug("DEL called.", cacheKey);
-    await this.asAtomic().atomic_del(cacheKey.key, cacheKey.sortKey);
+    await this.asAtomic().atomic_del(cacheKey.key, cacheKey.sortKey, this.prefix, this.sls);
   }
 
   /**
@@ -480,32 +443,17 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
   }
 
   /**
-   * Prunes the cache so that only `n` latest sortKey's are left for each cached key
+   * Prunes the cache so that only `entriesStored` latest sortKey's are left for each cached key
    * @param entriesStored how many latest entries should be left for each cached key
    * @returns `null`
    */
   async prune(entriesStored = 1): Promise<PruneStats | null> {
-    // make sure `entriesStored` is positive
-    // this many entries will be left for each key
     if (!entriesStored || entriesStored <= 0) {
       entriesStored = 1;
     }
+
     this.logger.debug("PRUNE called.", { entriesStored });
-
-    const keys = await this.getAllKeys();
-    for (const key of keys) {
-      const cacheKeys = await this.client.zrevrangebylex(
-        `${this.prefix}.keys`,
-        `[${key}${this.sls}${lastPossibleSortKey}`,
-        `[${key}${this.sls}${genesisSortKey}`
-      );
-      if (cacheKeys.length > entriesStored) {
-        const keysToRemove = cacheKeys.slice(entriesStored);
-        await this.asAtomic().zrem(`${this.prefix}.keys`, keysToRemove);
-        await this.asAtomic().del(keysToRemove.map((cacheKey) => `${this.prefix}.${cacheKey}`));
-      }
-    }
-
+    await this.asAtomic().atomic_prune(entriesStored, this.prefix, this.sls);
     return null;
   }
 
@@ -563,7 +511,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
     }
   }
 
-  storage<S>() {
+  storage<S = Redis>() {
     return this.client as S;
   }
 }

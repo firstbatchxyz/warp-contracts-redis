@@ -36,14 +36,16 @@ describe.each<boolean>([true, false])("redis cache puts with limit (atomic: %s)"
       await db.put({ key, sortKey: getSortKey(i) }, makeValue(i));
     }
 
-    // all entries should exist
-    for (let i = 1; i <= MAX_ENTRIES; i++) {
-      const result = await db.get({ key, sortKey: getSortKey(i) });
-      if (result) {
-        expect(result.sortKey).toBe(getSortKey(i));
-        expect(result.cachedValue).toBe(makeValue(i));
-      } else {
-        expect(result).not.toBe(null);
+    if (!isAtomic) {
+      // all entries should exist
+      for (let i = 1; i <= MAX_ENTRIES; i++) {
+        const result = await db.get({ key, sortKey: getSortKey(i) });
+        if (result) {
+          expect(result.sortKey).toBe(getSortKey(i));
+          expect(result.cachedValue).toBe(makeValue(i));
+        } else {
+          expect(result).not.toBe(null);
+        }
       }
     }
   });

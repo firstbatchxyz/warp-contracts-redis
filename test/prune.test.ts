@@ -27,7 +27,7 @@ describe.each<boolean>([true, false])("redis cache prune (atomic: %s)", (isAtomi
     );
   });
 
-  it(`should prune keys (atomic: ${isAtomic})`, async () => {
+  it("should prune keys", async () => {
     if (isAtomic) {
       await db.begin();
     }
@@ -39,11 +39,7 @@ describe.each<boolean>([true, false])("redis cache prune (atomic: %s)", (isAtomi
     }
 
     // prune to leave only `n` sortKey's for each of them
-    const pruneStats = await db.prune(ENTRIES_STORED);
-    if (pruneStats) {
-      expect(pruneStats.entriesBefore).toBe(LAST_HEIGHT * keySuffixes.length);
-      expect(pruneStats.entriesAfter).toBe(ENTRIES_STORED * keySuffixes.length);
-    }
+    await db.prune(ENTRIES_STORED);
 
     // commit afterwards to see if effects took place
     if (isAtomic) {
@@ -72,7 +68,7 @@ describe.each<boolean>([true, false])("redis cache prune (atomic: %s)", (isAtomi
 
   afterAll(async () => {
     // clean everything
-    await db.storage<Redis>().flushdb();
+    await db.storage().flushdb();
 
     // need to wait a bit otherwise you get `DisconnectsClientError` error
     await new Promise((res) => {

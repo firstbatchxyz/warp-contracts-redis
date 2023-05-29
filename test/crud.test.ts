@@ -24,11 +24,13 @@ describe("redis cache CRUD operations", () => {
     );
   });
 
-  it("should get & set keys", async () => {
+  it("should set keys", async () => {
     for (let i = 1; i <= LAST_HEIGHT; i++) {
       await db.put({ key, sortKey: getSortKey(i) }, makeValue(i));
     }
+  });
 
+  it("should get keys", async () => {
     for (let i = 1; i <= LAST_HEIGHT; i++) {
       const result = await db.get({ key, sortKey: getSortKey(i) });
       if (result) {
@@ -91,7 +93,7 @@ describe("redis cache CRUD operations", () => {
 
   afterAll(async () => {
     // clean everything
-    await db.storage<Redis>().flushdb();
+    // await db.storage<Redis>().flushdb();
 
     // need to wait a bit otherwise you get `DisconnectsClientError` error
     await new Promise((res) => {
