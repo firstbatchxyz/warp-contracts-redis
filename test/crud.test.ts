@@ -3,8 +3,6 @@ import { RedisCache } from "../src";
 import { getSortKey, makeValue } from "./utils";
 import constants from "./constants";
 
-jest.setTimeout(100_000);
-
 describe("redis cache CRUD operations", () => {
   let db: RedisCache<number>;
   const LAST_HEIGHT = 5;
@@ -20,7 +18,7 @@ describe("redis cache CRUD operations", () => {
       {
         minEntriesPerContract: 10,
         maxEntriesPerContract: 100,
-        isAtomic: false,
+        isAtomic: true,
         url: constants.REDIS_URL,
       }
     );

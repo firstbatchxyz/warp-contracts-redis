@@ -9,10 +9,12 @@ import {
   lastPossibleSortKey,
   CacheOptions,
 } from "warp-contracts";
-import { Redis, ChainableCommander } from "ioredis";
+import { Redis } from "ioredis";
+import type { ChainableCommander } from "ioredis";
 import type { RedisOptions } from "types/redisCache";
 import type { SortKeyCacheRangeOptions } from "warp-contracts/lib/types/cache/SortKeyCacheRangeOptions";
 import stringify from "safe-stable-stringify";
+import { LuaScriptBuilder } from "./luaScripts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export class RedisCache<V = any> implements SortKeyCache<V> {
@@ -36,11 +38,14 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    * disable `open` and `close` functions. As such, `this.isOpen` will also not be touched.
    */
   isManaged: boolean;
-  /** This is a temporary fix until atomicity is implemented in full, will remove in future */
+  /** TODO: This is a temporary fix until atomicity is implemented in full, will remove in future */
   isAtomic: boolean;
-  /** Underlying Redis client (from ioredis) */
+  /** Underlying Redis client (from `ioredis`) */
   client: Redis;
-  /** An active transaction object */
+  /**
+   * A transaction object, returned by `MULTI`.
+   * @see {@link asAtomic}
+   */
   transaction: ChainableCommander | null = null;
 
   constructor(cacheOptions: CacheOptions, redisOptions: RedisOptions) {
@@ -65,13 +70,10 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
         // cant change config settings if client is not managed by Warp
         this.logger.warn("Client is managed by user, not changing config.");
       } else {
+        // configure no-persistance
         if (cacheOptions.inMemory) {
           this.logger.info("Configuring the redis for no-persistance mode.");
-          // see: How to disable Redis RDB and AOF? https://stackoverflow.com/a/34736871/21699616
-          // https://redis.io/docs/management/persistence/#append-only-file
-          this.client.config("SET", "appendonly", "no");
-          // https://redis.io/docs/management/persistence/#snapshotting
-          this.client.config("SET", "save", "");
+          RedisCache.setConfigForInMemory(this.client).then(() => this.logger.info("Configurations done."));
         }
       }
     });
@@ -87,6 +89,38 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
     if (this.minEntriesPerContract > this.maxEntriesPerContract) {
       throw new Error("minEntries > maxEntries");
     }
+
+    // define lua scripts
+    RedisCache.defineLuaScripts(this.client, this.prefix, this.sls);
+  }
+
+  /**
+   * Updates the Redis client configs with respect to `inMemory: true` cache option.
+   * This is done by the following:
+   *
+   * - `SET appendonly no`
+   * - `SET save ""`
+   *
+   *  See here: https://stackoverflow.com/a/34736871/21699616
+   *
+   * @param client redis client that is connected
+   */
+  static async setConfigForInMemory(client: Redis) {
+    await Promise.all([
+      // https://redis.io/docs/management/persistence/#append-only-file
+      client.config("SET", "appendonly", "no"),
+      // https://redis.io/docs/management/persistence/#snapshotting
+      client.config("SET", "save", ""),
+    ]);
+  }
+
+  /**
+   *
+   * @param client redis client that is connected
+   */
+  static defineLuaScripts(client: Redis, prefix: string, subLevelSeparator: string) {
+    const luaScripts = new LuaScriptBuilder(prefix, subLevelSeparator);
+    luaScripts.commands().forEach((command) => client.defineCommand(command[0], command[1]));
   }
 
   //////////////////// TRANSACTION LOGIC ////////////////////
@@ -168,15 +202,17 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
       }
     }
   }
+
   //////////////////// KEYS & KVMAP ////////////////////
   /**
    * Returns all cached keys. A SortKeyCacheRange can be given, where specific keys can be filtered.
    * Note that the range option applies to `keys` themselves, not the `sortKey` part of it.
    * @param sortKey
-   * @param options
+   * @param options a set of options for the query
    */
   async keys(sortKey: string, options?: SortKeyCacheRangeOptions): Promise<string[]> {
     this.logger.debug("KEYS called.", { sortKey, options });
+
     // prepare range arguments
     let limit: number | undefined = undefined;
     let isReverse = false;
@@ -269,7 +305,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
     // map `key|sortKey` to `key` only
     const keys = cacheKeys.map((v) => v.split(this.sls)[0]);
     // unique keys only
-    return keys.filter((v, i, a) => a.indexOf(v) === i);
+    return keys.filter((val, idx, arr) => arr.indexOf(val) === idx);
   }
 
   /**
@@ -427,13 +463,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    */
   async del(cacheKey: CacheKey): Promise<void> {
     this.logger.debug("DEL called.", cacheKey);
-    const cacheKeysToRemove = await this.client.zrangebylex(
-      `${this.prefix}.keys`,
-      `[${cacheKey.key}${this.sls}${cacheKey.sortKey}`,
-      `[${cacheKey.key}${this.sls}${lastPossibleSortKey}`
-    );
-    await this.asAtomic().zrem(`${this.prefix}.keys`, cacheKeysToRemove);
-    await this.asAtomic().del(cacheKeysToRemove.map((cacheKey) => `${this.prefix}.${cacheKey}`));
+    await this.asAtomic().atomic_del(cacheKey.key, cacheKey.sortKey);
   }
 
   /**
@@ -452,7 +482,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
   /**
    * Prunes the cache so that only `n` latest sortKey's are left for each cached key
    * @param entriesStored how many latest entries should be left for each cached key
-   * @returns `PruneStats` but only the entry info is correct, not the sizes!
+   * @returns `null`
    */
   async prune(entriesStored = 1): Promise<PruneStats | null> {
     // make sure `entriesStored` is positive
@@ -462,8 +492,6 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
     }
     this.logger.debug("PRUNE called.", { entriesStored });
 
-    let entriesBefore = 0;
-    let entriesAfter = 0;
     const keys = await this.getAllKeys();
     for (const key of keys) {
       const cacheKeys = await this.client.zrevrangebylex(
@@ -471,25 +499,14 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
         `[${key}${this.sls}${lastPossibleSortKey}`,
         `[${key}${this.sls}${genesisSortKey}`
       );
-      if (cacheKeys.length <= entriesStored) {
-        // nothing will change w.r.t. this key
-        entriesBefore += cacheKeys.length;
-        entriesAfter += cacheKeys.length;
-      } else {
+      if (cacheKeys.length > entriesStored) {
         const keysToRemove = cacheKeys.slice(entriesStored);
         await this.asAtomic().zrem(`${this.prefix}.keys`, keysToRemove);
         await this.asAtomic().del(keysToRemove.map((cacheKey) => `${this.prefix}.${cacheKey}`));
-        entriesBefore += cacheKeys.length;
-        entriesAfter += entriesStored;
       }
     }
 
-    return {
-      entriesBefore,
-      entriesAfter,
-      sizeBefore: 0, // TODO: add size info
-      sizeAfter: 0, // TODO: add size info
-    };
+    return null;
   }
 
   //////////////////// CLIENT FUNCTIONS ////////////////////
@@ -556,6 +573,6 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
  * @todo this should probably be exported from warp in the future
  * @todo no values are wrapped yet, check after testing
  */
-class ClientValueWrapper<V> {
-  constructor(readonly value: V, readonly tomb: boolean = false) {}
-}
+// class ClientValueWrapper<V> {
+//   constructor(readonly value: V, readonly tomb: boolean = false) {}
+// }

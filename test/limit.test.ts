@@ -3,8 +3,6 @@ import { RedisCache } from "../src";
 import { getSortKey, makeValue } from "./utils";
 import constants from "./constants";
 
-jest.setTimeout(100 * 1000);
-
 describe.each<boolean>([true, false])("redis cache puts with limit (atomic: %s)", (isAtomic) => {
   let db: RedisCache<number>;
   const MIN_ENTRIES = 5;
