@@ -1,9 +1,6 @@
-import type { Redis } from "ioredis";
 import { RedisCache } from "../src";
 import { getSortKey, makeValue } from "./utils";
 import constants from "./constants";
-
-jest.setTimeout(100 * 1000);
 
 describe("redis cache atomic transactions", () => {
   let db: RedisCache<number>;
@@ -20,7 +17,6 @@ describe("redis cache atomic transactions", () => {
       {
         minEntriesPerContract: MIN_ENTRIES,
         maxEntriesPerContract: MAX_ENTRIES,
-        isAtomic: true,
         url: constants.REDIS_URL,
       }
     );
@@ -97,7 +93,7 @@ describe("redis cache atomic transactions", () => {
 
   afterAll(async () => {
     // clean everything
-    await db.storage<Redis>().flushdb();
+    await db.storage().flushdb();
 
     // need to wait a bit otherwise you get `DisconnectsClientError` error
     await new Promise((res) => {

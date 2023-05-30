@@ -1,9 +1,6 @@
-import type { Redis } from "ioredis";
 import { RedisCache } from "../src";
 import { getSortKey, makeValue } from "./utils";
 import constants from "./constants";
-
-jest.setTimeout(100_000);
 
 describe("redis cache CRUD operations", () => {
   let db: RedisCache<number>;
@@ -20,17 +17,18 @@ describe("redis cache CRUD operations", () => {
       {
         minEntriesPerContract: 10,
         maxEntriesPerContract: 100,
-        isAtomic: false,
         url: constants.REDIS_URL,
       }
     );
   });
 
-  it("should get & set keys", async () => {
+  it("should set keys", async () => {
     for (let i = 1; i <= LAST_HEIGHT; i++) {
       await db.put({ key, sortKey: getSortKey(i) }, makeValue(i));
     }
+  });
 
+  it("should get keys", async () => {
     for (let i = 1; i <= LAST_HEIGHT; i++) {
       const result = await db.get({ key, sortKey: getSortKey(i) });
       if (result) {
@@ -93,7 +91,7 @@ describe("redis cache CRUD operations", () => {
 
   afterAll(async () => {
     // clean everything
-    await db.storage<Redis>().flushdb();
+    // await db.storage<Redis>().flushdb();
 
     // need to wait a bit otherwise you get `DisconnectsClientError` error
     await new Promise((res) => {

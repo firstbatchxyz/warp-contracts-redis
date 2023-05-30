@@ -1,0 +1,4 @@
+{
+  "Lua.diagnostics.globals": ["redis", "KEYS", "ARGV"],
+  "Lua.runtime.version": "Lua 5.1"
+}
