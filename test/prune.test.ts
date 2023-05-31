@@ -2,7 +2,7 @@ import { RedisCache } from "../src";
 import { getSortKey, makeValue } from "./utils";
 import constants from "./constants";
 
-describe.each<boolean>([true, false])("redis cache prune (atomic: %s)", (isAtomic) => {
+describe.each<boolean>([true, false])("prune (atomic: %s)", (isAtomic) => {
   let db: RedisCache<number>;
   const LAST_HEIGHT = 5;
   const ENTRIES_STORED = 2;
@@ -11,18 +11,7 @@ describe.each<boolean>([true, false])("redis cache prune (atomic: %s)", (isAtomi
 
   beforeAll(async () => {
     expect(ENTRIES_STORED).toBeLessThan(LAST_HEIGHT);
-    db = new RedisCache<number>(
-      {
-        inMemory: true,
-        dbLocation: constants.DBNAME,
-        subLevelSeparator: "|",
-      },
-      {
-        minEntriesPerContract: 10,
-        maxEntriesPerContract: 100,
-        url: constants.REDIS_URL,
-      }
-    );
+    db = new RedisCache<number>(constants.CACHE_OPTS, constants.REDIS_OPTS);
   });
 
   it("should prune keys", async () => {

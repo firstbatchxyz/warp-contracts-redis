@@ -5,22 +5,22 @@ import type { RedisCommander, Result, Callback } from "ioredis";
 declare module "ioredis" {
   interface RedisCommander<Context> {
     // prettier-ignore
-    atomic_del(
-      key: string,
-      sortKey: string,
-      prefix: string,
-      sls: string,
-      callback?: Callback<void>
-    ): Result<void, Context>;
+    // sortkeycache_atomic_del(
+    //   key: string,
+    //   sortKey: string,
+    //   prefix: string,
+    //   sls: string,
+    //   callback?: Callback<void>
+    // ): Result<void, Context>;
     // prettier-ignore
-    atomic_prune(
+    sortkeycache_atomic_prune(
       entriesStored: number,
       prefix: string,
       sls: string,
       callback?: Callback<void>
     ): Result<void, Context>;
     // prettier-ignore
-    atomic_put(
+    sortkeycache_atomic_put(
       key: string,
       sortKey: string,
       value: string,

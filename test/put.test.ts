@@ -2,7 +2,7 @@ import { RedisCache } from "../src";
 import { getSortKey, makeValue } from "./utils";
 import constants from "./constants";
 
-describe.each<boolean>([true, false])("redis cache puts with limit (atomic: %s)", (isAtomic) => {
+describe.each<boolean>([true, false])("put with pruning (atomic: %s)", (isAtomic) => {
   let db: RedisCache<number>;
   const MIN_ENTRIES = 5;
   const MAX_ENTRIES = 10;
@@ -10,18 +10,11 @@ describe.each<boolean>([true, false])("redis cache puts with limit (atomic: %s)"
 
   beforeAll(async () => {
     expect(MIN_ENTRIES).toBeLessThan(MAX_ENTRIES);
-    db = new RedisCache<number>(
-      {
-        inMemory: true,
-        dbLocation: constants.DBNAME,
-        subLevelSeparator: "|",
-      },
-      {
-        minEntriesPerContract: MIN_ENTRIES,
-        maxEntriesPerContract: MAX_ENTRIES,
-        url: constants.REDIS_URL,
-      }
-    );
+    db = new RedisCache<number>(constants.CACHE_OPTS, {
+      ...constants.REDIS_OPTS,
+      minEntriesPerContract: MIN_ENTRIES,
+      maxEntriesPerContract: MAX_ENTRIES,
+    });
   });
 
   it("should put cache keys", async () => {
