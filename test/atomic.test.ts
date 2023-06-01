@@ -2,24 +2,12 @@ import { RedisCache } from "../src";
 import { getSortKey, makeValue } from "./utils";
 import constants from "./constants";
 
-describe("redis cache atomic transactions", () => {
+describe("atomic transactions", () => {
   let db: RedisCache<number>;
-  const MIN_ENTRIES = 5;
-  const MAX_ENTRIES = 10;
+  const LAST_HEIGHT = 5;
 
   beforeAll(async () => {
-    db = new RedisCache(
-      {
-        inMemory: true,
-        dbLocation: constants.DBNAME,
-        subLevelSeparator: "|",
-      },
-      {
-        minEntriesPerContract: MIN_ENTRIES,
-        maxEntriesPerContract: MAX_ENTRIES,
-        url: constants.REDIS_URL,
-      }
-    );
+    db = new RedisCache(constants.CACHE_OPTS, constants.REDIS_OPTS);
   });
 
   it("should begin & commit a transaction", async () => {
@@ -27,12 +15,12 @@ describe("redis cache atomic transactions", () => {
     await db.begin();
 
     // put some keys
-    for (let i = 1; i <= MIN_ENTRIES; i++) {
+    for (let i = 1; i <= LAST_HEIGHT; i++) {
       await db.put({ key, sortKey: getSortKey(i) }, makeValue(i));
     }
 
     // should get null as they are not yet committed
-    for (let i = 1; i <= MIN_ENTRIES; i++) {
+    for (let i = 1; i <= LAST_HEIGHT; i++) {
       const result = await db.get({ key, sortKey: getSortKey(i) });
       expect(result).toBe(null);
     }
@@ -41,7 +29,7 @@ describe("redis cache atomic transactions", () => {
     await db.commit();
 
     // should get the keys afterwards
-    for (let i = 1; i <= MIN_ENTRIES; i++) {
+    for (let i = 1; i <= LAST_HEIGHT; i++) {
       const result = await db.get({ key, sortKey: getSortKey(i) });
       if (result) {
         expect(result.sortKey).toBe(getSortKey(i));
@@ -57,12 +45,12 @@ describe("redis cache atomic transactions", () => {
     await db.begin();
 
     // put some keys
-    for (let i = 1; i <= MIN_ENTRIES; i++) {
+    for (let i = 1; i <= LAST_HEIGHT; i++) {
       await db.put({ key, sortKey: getSortKey(i) }, makeValue(i));
     }
 
     // should get null as they are not yet committed
-    for (let i = 1; i <= MIN_ENTRIES; i++) {
+    for (let i = 1; i <= LAST_HEIGHT; i++) {
       const result = await db.get({ key, sortKey: getSortKey(i) });
       expect(result).toBe(null);
     }
@@ -71,7 +59,7 @@ describe("redis cache atomic transactions", () => {
     await db.rollback();
 
     // should be null again
-    for (let i = 1; i <= MIN_ENTRIES; i++) {
+    for (let i = 1; i <= LAST_HEIGHT; i++) {
       const result = await db.get({ key, sortKey: getSortKey(i) });
       expect(result).toBe(null);
     }

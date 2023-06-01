@@ -16,7 +16,7 @@ You can see if the client is managed or not via the `isManaged` field.
 
 ### Lua Scripts
 
-Some of the functionality is achieved via Lua scripts, which you can find under `src/lua` for _reference_; the actual scripts are written in `luaScripts.ts`. The `prefix` and `subLevelSeparator` must be provided as argument to Lua scripts, because multiple RedisCache instances may be created with different prefixes or sub-level separators but they may connect to the same client; and for that reason we can't simply hardcode them in the script.
+Some of the functionality is achieved via Lua scripts (v5.1), which you can find under `src/lua` for _reference_; the actual scripts are written in `luaScripts.ts`. The `prefix` and `subLevelSeparator` must be provided as argument to Lua scripts, because multiple RedisCache instances may be created with different prefixes or sub-level separators but they may connect to the same client; and for that reason we can't simply hardcode them in the script.
 
 ## Installation
 

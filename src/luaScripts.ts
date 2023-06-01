@@ -8,34 +8,9 @@
  * - `readOnly` is an additional option, where if true, the script is treated as read-only. See
  * the relevant section here: {@link https://redis.io/docs/manual/programmability/#read-only-scripts}
  */
-type LuaCommandDefintionType = { lua: string; numberOfKeys: number; readOnly?: boolean };
-
-export const luaScripts: { [name: string]: LuaCommandDefintionType } = {
-  /** {@see [definition](./lua/del.lua)} */
-  atomic_del: {
-    lua: `
-local key = KEYS[1]
-local sortKey = KEYS[2]
-local prefix = ARGV[1]
-local sls = ARGV[2]
-
-local cacheKeysToRemove = redis.call(
-"ZRANGE",
-prefix .. ".keys",
-"[" .. key .. sls .. sortKey,
-"(" .. key .. sls .. "999999999999,9999999999999,zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
-"BYLEX"
-)
-
-redis.call("ZREM", prefix .. ".keys", unpack(cacheKeysToRemove))
-for _, cacheKey in pairs(cacheKeysToRemove) do
-redis.call("DEL", prefix .. "." .. cacheKey)
-end
-`,
-    numberOfKeys: 2,
-  },
+export const luaScripts: { [name: string]: { lua: string; numberOfKeys: number; readOnly?: boolean } } = {
   /** {@see [definition](./lua/prune.lua)} */
-  atomic_prune: {
+  sortkeycache_atomic_prune: {
     lua: `
 local entriesStored = KEYS[1]
 local prefix = ARGV[1]
@@ -76,7 +51,7 @@ end
     numberOfKeys: 1,
   },
   /** {@see [definition](./lua/put.lua)} */
-  atomic_put: {
+  sortkeycache_atomic_put: {
     lua: `
 local key = KEYS[1]
 local sortKey = KEYS[2]

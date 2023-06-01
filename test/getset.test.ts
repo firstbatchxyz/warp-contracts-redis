@@ -1,25 +1,15 @@
 import { RedisCache } from "../src";
 import { getSortKey, makeValue } from "./utils";
 import constants from "./constants";
+import { SortKeyCacheResult } from "warp-contracts";
 
-describe("redis cache CRUD operations", () => {
+describe("get & set logic", () => {
   let db: RedisCache<number>;
   const LAST_HEIGHT = 5;
   const key = "crudtest";
 
   beforeAll(async () => {
-    db = new RedisCache<number>(
-      {
-        inMemory: false,
-        dbLocation: constants.DBNAME,
-        subLevelSeparator: "|",
-      },
-      {
-        minEntriesPerContract: 10,
-        maxEntriesPerContract: 100,
-        url: constants.REDIS_URL,
-      }
-    );
+    db = new RedisCache<number>(constants.CACHE_OPTS, constants.REDIS_OPTS);
   });
 
   it("should set keys", async () => {
@@ -55,43 +45,35 @@ describe("redis cache CRUD operations", () => {
     }
   });
 
-  it("should delete keys properly", async () => {
-    const delHeight = 2;
+  it("should get less or equal correctly", async () => {
+    let result: SortKeyCacheResult<number> | null = null;
 
-    await db.del({ key, sortKey: getSortKey(delHeight) });
-
-    // lower sortKey's should be accessible alright
-    for (let i = 1; i < delHeight; i++) {
-      const result = await db.get({ key, sortKey: getSortKey(i) });
-      if (result) {
-        expect(result.sortKey).toBe(getSortKey(i));
-        expect(result.cachedValue).toBe(makeValue(i));
-      } else {
-        expect(result).not.toBe(null);
-      }
+    // last height
+    result = await db.getLessOrEqual(key, getSortKey(LAST_HEIGHT));
+    if (result) {
+      expect(result.sortKey).toBe(getSortKey(LAST_HEIGHT));
+      expect(result.cachedValue).toBe(makeValue(LAST_HEIGHT));
+    } else {
+      expect(result).not.toBe(null);
     }
 
-    // greater-equal sortKey's should be gone
-    for (let i = delHeight; i <= LAST_HEIGHT; i++) {
-      const result = await db.get({ key, sortKey: getSortKey(i) });
-      expect(result).toBe(null);
+    // 1st sort key
+    result = await db.getLessOrEqual(key, getSortKey(1));
+    if (result) {
+      expect(result.sortKey).toBe(getSortKey(1));
+      expect(result.cachedValue).toBe(makeValue(1));
+    } else {
+      expect(result).not.toBe(null);
     }
 
-    // getLast should return the latest sortKey before the deleted one
-    {
-      const result = await db.getLast(key);
-      if (result) {
-        expect(result.sortKey).toBe(getSortKey(delHeight - 1));
-        expect(result.cachedValue).toBe(makeValue(delHeight - 1));
-      } else {
-        expect(result).not.toBe(null);
-      }
-    }
+    const nonExistentKey = "fdshkjgfhvkjhfkjshd";
+    result = await db.getLessOrEqual(nonExistentKey, getSortKey(LAST_HEIGHT));
+    expect(result).toBe(null);
   });
 
   afterAll(async () => {
     // clean everything
-    // await db.storage<Redis>().flushdb();
+    await db.storage().flushdb();
 
     // need to wait a bit otherwise you get `DisconnectsClientError` error
     await new Promise((res) => {

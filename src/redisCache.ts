@@ -10,12 +10,13 @@ import {
   CacheOptions,
 } from "warp-contracts";
 import type { SortKeyCacheRangeOptions } from "warp-contracts/lib/types/cache/SortKeyCacheRangeOptions";
-import { Redis } from "ioredis";
 import type { ChainableCommander } from "ioredis";
+import { Redis } from "ioredis";
 import stringify from "safe-stable-stringify";
-
 import { luaScripts } from "./luaScripts";
 import type { RedisOptions } from "./types/redisCache";
+
+const DELETED_VALUE = "";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export class RedisCache<V = any> implements SortKeyCache<V> {
@@ -215,31 +216,19 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
       }
     }
 
-    // get the range of keys
-    const cacheKeys = isReverse
-      ? await this.client.zrevrangebylex(`${this.prefix}.keys`, upperBound, lowerBound)
-      : await this.client.zrangebylex(`${this.prefix}.keys`, lowerBound, upperBound);
+    // get the range of keys in reverse (reverse ordering is required for the next step)
+    const cacheKeys = await this.client.zrevrangebylex(`${this.prefix}.keys`, upperBound, lowerBound);
 
     // get the latest `sortKey` for each `key`
     // which would be the first time it appears here in this sorted array
-    const latestKeys = cacheKeys.reduce<{
-      result: string[];
-      prevKey: string;
-    }>(
-      (acc, curCacheKey) => {
-        const key = curCacheKey.split(this.sls)[0];
-        if (acc.prevKey !== key) {
-          acc.result.push(key);
-          acc.prevKey = key;
-        }
-        return acc;
-      },
-      {
-        result: [],
-        prevKey: "",
-      }
-    ).result;
+    const latestKeys = this.reduceCacheKeys(cacheKeys).map((cacheKeys) => cacheKeys.split(this.sls)[0]);
 
+    // reverse the order of keys
+    if (isReverse) {
+      latestKeys.reverse();
+    }
+
+    // return with limit
     return latestKeys.slice(0, limit);
   }
 
@@ -252,9 +241,9 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
   async kvMap(sortKey: string, options?: SortKeyCacheRangeOptions): Promise<Map<string, V>> {
     this.logger.debug("KVMAP called.", { sortKey, options });
     const keys = await this.keys(sortKey, options);
+    const values = await this.client.mget(keys);
 
     const map: Map<string, V> = new Map();
-    const values = await this.client.mget(keys);
     for (let i = 0; i < keys.length; ++i) {
       // not checking for `null` here because interface
       // expects V only; this is understanble, as we are getting
@@ -266,13 +255,6 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
   }
 
   //////////////////// GETTER FUNCTIONS ////////////////////
-  /**
-   * Get all cache keys, without the prefix.
-   * @returns an array of cacheKeys in the form `key|sortKey`
-   */
-  private async getAllCacheKeys(): Promise<string[]> {
-    return this.client.zrangebylex(`${this.prefix}.keys`, "-", "+");
-  }
 
   /**
    * Given a key, returns the latest sortKey.
@@ -281,10 +263,11 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    * @returns the latest `sortKey` of this `key`
    */
   private async getLatestSortKey(key: string, maxSortKey?: string): Promise<string | null> {
+    // find the latest sortKey of this key
     const result = await this.client.zrevrangebylex(
       `${this.prefix}.keys`,
       `[${key}${this.sls}${maxSortKey || lastPossibleSortKey}`,
-      "-",
+      `(${key}${this.sls}${genesisSortKey}`,
       "LIMIT",
       0,
       1
@@ -295,11 +278,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
       const resultSplit = result[0].split(this.sls);
       if (resultSplit.length !== 2) {
         throw new Error("Result is not CacheKey");
-      } else if (resultSplit[0] !== key) {
-        // although there are keys in db, none belong to this key
-        return null;
       }
-
       return resultSplit[1];
     }
     return null;
@@ -312,16 +291,26 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    */
   async get(cacheKey: CacheKey): Promise<SortKeyCacheResult<V> | null> {
     this.logger.debug(`GET called.`, cacheKey);
-
     const res = await this.client.get(`${this.prefix}.${cacheKey.key}${this.sls}${cacheKey.sortKey}`);
+
+    // key not existent
     if (res == null) {
       return null;
     }
-
-    return {
-      sortKey: cacheKey.sortKey,
-      cachedValue: JSON.parse(res) as V,
-    };
+    // key exists & was deleted
+    else if (res == DELETED_VALUE) {
+      return {
+        sortKey: cacheKey.sortKey,
+        cachedValue: null,
+      };
+    }
+    // key exists & has a value
+    else {
+      return {
+        sortKey: cacheKey.sortKey,
+        cachedValue: JSON.parse(res) as V,
+      };
+    }
   }
 
   /**
@@ -347,18 +336,13 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
       sortKey,
     });
     const latestSortKey = await this.getLatestSortKey(key, sortKey);
+
+    // no sortKey for this key
     if (latestSortKey == null) {
       return null;
     }
 
-    // get the actual value at that key
-    const value = await this.client.get(`${this.prefix}.${key}${this.sls}${latestSortKey}`);
-    return value
-      ? {
-          sortKey: latestSortKey,
-          cachedValue: JSON.parse(value),
-        }
-      : null;
+    return await this.get({ key, sortKey: latestSortKey });
   }
 
   /**
@@ -367,15 +351,21 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    */
   async getLastSortKey(): Promise<string | null> {
     this.logger.debug(`GET LAST SORT KEY called.`);
-    const cacheKeys = await this.getAllCacheKeys();
-    if (cacheKeys.length !== 0) {
-      // map `key|sortKey` to `sortKey` only
-      const sortKeys = cacheKeys.map((v) => v.split(this.sls)[1]);
-      // get the last one after sorting by `sortKey`s alone
-      return sortKeys.sort().at(-1);
-    } else {
+
+    // get all cache keys
+    const cacheKeys = await this.client.zrevrangebylex(`${this.prefix}.keys`, "+", "-");
+    if (!cacheKeys.length) {
+      // no keys!
       return null;
     }
+
+    const latestCacheKeys = this.reduceCacheKeys(cacheKeys);
+
+    // map `key|sortKey` to `sortKey` only
+    const sortKeys = latestCacheKeys.map((v) => v.split(this.sls)[1]);
+    // get the last one after sorting by `sortKey`s alone
+    // this extra sort is needed because the first ordering respected key name too
+    return sortKeys.sort().at(-1);
   }
 
   //////////////////// SET FUNCTIONS ////////////////////
@@ -388,7 +378,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    */
   async put(cacheKey: CacheKey, value: V): Promise<void> {
     this.logger.debug("PUT called.", cacheKey);
-    await this.asAtomic().atomic_put(
+    await this.asAtomic().sortkeycache_atomic_put(
       cacheKey.key,
       cacheKey.sortKey,
       stringify(value),
@@ -403,11 +393,29 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
   /**
    * Deletes keys are not below a given `sortKey` for some `key`.
    * Values below that `sortKey` should still be accessible.
+   *
+   * This is achieved by setting the key to be deleted with empty string `""`.
+   * It can be checked via `MEMORY USAGE key` in Redis that this is equal
+   * in size to setting `null`. The only more optimized variant is setting 0,
+   * but that is dangerous as it might occur in a normally set value too.
+   *
+   * Note that this does not prevent a user to set empty string to some key,
+   * because all values are stringified during a SET, and the stringification
+   * of empty string is `"\"\""` instead of `""` alone!
+   *
    * @param cacheKey a key and sortKey
    */
   async del(cacheKey: CacheKey): Promise<void> {
     this.logger.debug("DEL called.", cacheKey);
-    await this.asAtomic().atomic_del(cacheKey.key, cacheKey.sortKey, this.prefix, this.sls);
+    await this.asAtomic().sortkeycache_atomic_put(
+      cacheKey.key,
+      cacheKey.sortKey,
+      DELETED_VALUE, // instead of null, we put an empty string
+      this.minEntriesPerContract,
+      this.maxEntriesPerContract,
+      this.prefix,
+      this.sls
+    );
   }
 
   /**
@@ -434,10 +442,45 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
     }
 
     this.logger.debug("PRUNE called.", { entriesStored });
-    await this.asAtomic().atomic_prune(entriesStored, this.prefix, this.sls);
+    await this.asAtomic().sortkeycache_atomic_prune(entriesStored, this.prefix, this.sls);
     return null;
   }
 
+  //////////////////// UTILITY FUNCTIONS ///////////////////
+  /**
+   * Reduces the cache keys so that only the latest sortKey is left for
+   * each key. The input is assumed to be have the cacheKeys in reverse
+   * lexicographical ordering.
+   *
+   * ```ts
+   * // input
+   * ['c|3', 'c|2', 'c|1', 'b|5', 'b|2', 'a|6', 'a|5', 'a|2']
+   *
+   * // output
+   * ['c|3', 'b|5', 'a|6']
+   * ```
+   * @param cacheKeys an array of cacheKeys in the form `key|sortKey`.
+   * @returns a reduced array with the latest sortKey per key.
+   */
+  private reduceCacheKeys(cacheKeys: string[]): string[] {
+    return cacheKeys.reduce<{
+      result: string[]; // accumulation of cacheKeys
+      prevKey: string; // the last read key
+    }>(
+      (acc, cacheKey) => {
+        const key = cacheKey.split(this.sls)[0];
+        if (acc.prevKey !== key) {
+          acc.result.push(cacheKey);
+          acc.prevKey = key;
+        }
+        return acc;
+      },
+      {
+        result: [],
+        prevKey: "",
+      }
+    ).result;
+  }
   //////////////////// CLIENT FUNCTIONS ////////////////////
   /**
    * Calls `connect` function of Redis client.
@@ -496,10 +539,3 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
     return this.client as S;
   }
 }
-
-/**
- * Client values must be wrapped with this class in KV.
- */
-// class ClientValueWrapper<V> {
-//   constructor(readonly value: V, readonly tomb: boolean = false) {}
-// }
