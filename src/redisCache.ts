@@ -248,6 +248,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    */
   async kvMap(sortKey: string, options?: SortKeyCacheRangeOptions): Promise<Map<string, V>> {
     this.logger.debug("KVMAP called.", { sortKey, options });
+
     const cacheKeys = await this.cacheKeys(sortKey, options);
     const values = await this.client.mget(cacheKeys.map((cacheKey) => `${this.prefix}.${cacheKey}`));
 
