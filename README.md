@@ -10,7 +10,8 @@ Warp Contracts will `open` and `close` the client many times, and we have seen t
 
 - `open` function will be disabled, calling it will have no effect; it is user's responsibility to connect.
 - `close` function will be disabled, calling it will have no effect; it is user's responsibility to disconnect.
-- the user should make the necessary configurations for `inMemory: true` option; a static function is exposed for this purpose: `this.setConfigForInMemory`.
+- the user should make the necessary configurations for `inMemory: true` option; a static function is exposed for this purpose: `setConfigForInMemory`.
+- the user should define the required Lua scripts on their server; a static function is exposed for this purpose: `defineLuaScripts`.
 
 You can see if the client is managed or not via the `isManaged` field.
 
