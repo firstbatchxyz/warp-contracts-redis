@@ -179,7 +179,13 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
   }
 
   //////////////////// KEYS & KVMAP ////////////////////
-  async cacheKeys(sortKey: string, options?: SortKeyCacheRangeOptions): Promise<string[]> {
+  /**
+   * Returns all `cacheKey`s. A `SortKeyCacheRange` can be given, where specific keys can be filtered.
+   * Note that the range option applies to `keys` themselves, not the `sortKey` part of it.
+   * @param sortKey maximum sortKey
+   * @param options a set of range options for the query
+   */
+  private async cacheKeys(sortKey: string, options?: SortKeyCacheRangeOptions): Promise<string[]> {
     this.logger.debug("CACHE KEYS called.", { sortKey, options });
 
     // prepare range arguments
@@ -218,14 +224,15 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
       latestCacheKeys.reverse();
     }
 
+    // return with limit; returns the entire array if `limit >= length`.
     return latestCacheKeys.slice(0, limit);
   }
 
   /**
-   * Returns all cached keys. A SortKeyCacheRange can be given, where specific keys can be filtered.
+   * Returns all `key`s. A `SortKeyCacheRange` can be given, where specific keys can be filtered.
    * Note that the range option applies to `keys` themselves, not the `sortKey` part of it.
-   * @param sortKey
-   * @param options a set of options for the query
+   * @param sortKey maximum sortKey
+   * @param options a set of range options for the query
    */
   async keys(sortKey: string, options?: SortKeyCacheRangeOptions): Promise<string[]> {
     this.logger.debug("KEYS called.", { sortKey, options });
