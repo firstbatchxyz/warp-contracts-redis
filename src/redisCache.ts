@@ -1,22 +1,17 @@
-import {
-  CacheKey,
-  genesisSortKey,
-  LoggerFactory,
-  SortKeyCache,
-  SortKeyCacheResult,
-  PruneStats,
-  BatchDBOp,
-  lastPossibleSortKey,
-  CacheOptions,
-} from "warp-contracts";
+import type { SortKeyCache, PruneStats, BatchDBOp, CacheOptions } from "warp-contracts";
 import type { SortKeyCacheRangeOptions } from "warp-contracts/lib/types/cache/SortKeyCacheRangeOptions";
 import type { ChainableCommander } from "ioredis";
+import { CacheKey, genesisSortKey, LoggerFactory, SortKeyCacheResult, lastPossibleSortKey } from "warp-contracts";
 import { Redis } from "ioredis";
 import stringify from "safe-stable-stringify";
 import { luaScripts } from "./luaScripts";
 import type { RedisOptions } from "./types/redisCache";
 
-const DELETED_VALUE = "";
+/** A deleted value placeholder is to differentiate a `null` result that
+ * may belong to a deleted key or a non-existent key. This is required due to
+ * SortKeyCache logic.
+ */
+const DELETED_VALUE_PLACEHOLDER = "";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export class RedisCache<V = any> implements SortKeyCache<V> {
@@ -64,20 +59,6 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
       throw new Error("You must provide either connection info or a client.");
     }
 
-    // open client and set config
-    this.open().then(() => {
-      if (this.isManaged) {
-        // cant change config settings if client is not managed by Warp
-        this.logger.warn("Client is managed by user, not changing config.");
-      } else {
-        // configure no-persistance
-        if (cacheOptions.inMemory) {
-          this.logger.info("Configuring the redis for no-persistance mode.");
-          RedisCache.setConfigForInMemory(this.client).then(() => this.logger.info("Configurations done."));
-        }
-      }
-    });
-
     // cache options
     this.prefix = cacheOptions.dbLocation;
     this.sls = cacheOptions.subLevelSeparator || "|";
@@ -89,8 +70,20 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
       throw new Error("minEntries > maxEntries");
     }
 
-    // define lua scripts
-    RedisCache.defineLuaScripts(this.client);
+    if (this.isManaged) {
+      this.logger.warn("Client is managed by user, skipping configurations.");
+    } else {
+      // add lua scripts
+      this.logger.info("Defining Lua scripts.");
+      RedisCache.defineLuaScripts(this.client);
+      // configure no-persistance
+      if (cacheOptions.inMemory) {
+        this.open().then(() => {
+          this.logger.info("Configuring the redis for no-persistance mode.");
+          RedisCache.setConfigForInMemory(this.client).then(() => this.logger.info("Configurations done."));
+        });
+      }
+    }
   }
 
   /**
@@ -102,7 +95,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    *
    *  See here: https://stackoverflow.com/a/34736871/21699616
    *
-   * @param client redis client that is connected
+   * @param client redis client that we are connected to
    */
   static async setConfigForInMemory(client: Redis) {
     await Promise.all([
@@ -115,7 +108,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
 
   /**
    * Defines the Lua scripts needed by RedisCache to the provided client.
-   * @param client redis client that is connected
+   * @param client redis client that we are connected to
    */
   static defineLuaScripts(client: Redis) {
     Object.entries(luaScripts).forEach(([name, definition]) => client.defineCommand(name, definition));
@@ -186,6 +179,48 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
   }
 
   //////////////////// KEYS & KVMAP ////////////////////
+  async cacheKeys(sortKey: string, options?: SortKeyCacheRangeOptions): Promise<string[]> {
+    this.logger.debug("CACHE KEYS called.", { sortKey, options });
+
+    // prepare range arguments
+    let limit: number | undefined = undefined;
+    let isReverse = false;
+    let lowerBound = "-"; // equals `-inf` in lex ordering
+    let upperBound = "+"; // equals `+inf` in lex ordering
+    if (options) {
+      // limit option does not apply to the cacheKey query, but to the final list of keys instead
+      if (options.limit) {
+        limit = options.limit;
+      }
+      // reverse option does not apply to the cacheKey query, but to the final list of keys instead
+      if (options.reverse) {
+        isReverse = options.reverse;
+      }
+      // pick keys that are lexicographically less than this key (exclusive)
+      if (options.lt) {
+        upperBound = `(${options.lt}${this.sls}${genesisSortKey}`;
+      }
+      // pick keys that are lexicographically greater-equal to this key (inclusive)
+      if (options.gte) {
+        lowerBound = `(${options.gte}${this.sls}${genesisSortKey}`;
+      }
+    }
+
+    // get the range of keys in reverse (reverse ordering is required for the next step)
+    const cacheKeys = await this.client.zrevrangebylex(`${this.prefix}.keys`, upperBound, lowerBound);
+
+    // reduce keys to obtain latest sortKey (with respect to maxSortKey)
+    const latestCacheKeys = this.reduceCacheKeys(cacheKeys, sortKey);
+
+    // the query above is reversed already, so if we need the query to be not reversed,
+    // we need to reverse it again
+    if (!isReverse) {
+      latestCacheKeys.reverse();
+    }
+
+    return latestCacheKeys.slice(0, limit);
+  }
+
   /**
    * Returns all cached keys. A SortKeyCacheRange can be given, where specific keys can be filtered.
    * Note that the range option applies to `keys` themselves, not the `sortKey` part of it.
@@ -194,42 +229,8 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    */
   async keys(sortKey: string, options?: SortKeyCacheRangeOptions): Promise<string[]> {
     this.logger.debug("KEYS called.", { sortKey, options });
-
-    // prepare range arguments
-    let limit: number | undefined = undefined;
-    let isReverse = false;
-    let lowerBound = "-"; // equals `-inf` in lex ordering
-    let upperBound = "+"; // equals `+inf` in lex ordering
-    if (options) {
-      // limit option does not apply to this query, but to the final list instead
-      if (options.limit) {
-        limit = options.limit;
-      }
-      if (options.reverse) {
-        isReverse = options.reverse;
-      }
-      if (options.lt) {
-        upperBound = `[${options.gte}${this.sls}${sortKey}`;
-      }
-      if (options.gte) {
-        lowerBound = `(${options.lt}${this.sls}${genesisSortKey}`;
-      }
-    }
-
-    // get the range of keys in reverse (reverse ordering is required for the next step)
-    const cacheKeys = await this.client.zrevrangebylex(`${this.prefix}.keys`, upperBound, lowerBound);
-
-    // get the latest `sortKey` for each `key`
-    // which would be the first time it appears here in this sorted array
-    const latestKeys = this.reduceCacheKeys(cacheKeys).map((cacheKeys) => cacheKeys.split(this.sls)[0]);
-
-    // reverse the order of keys
-    if (isReverse) {
-      latestKeys.reverse();
-    }
-
-    // return with limit
-    return latestKeys.slice(0, limit);
+    const cacheKeys = await this.cacheKeys(sortKey, options);
+    return cacheKeys.map((cacheKey) => cacheKey.split(this.sls)[0]);
   }
 
   /**
@@ -240,15 +241,16 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    */
   async kvMap(sortKey: string, options?: SortKeyCacheRangeOptions): Promise<Map<string, V>> {
     this.logger.debug("KVMAP called.", { sortKey, options });
-    const keys = await this.keys(sortKey, options);
-    const values = await this.client.mget(keys);
+    const cacheKeys = await this.cacheKeys(sortKey, options);
+    const values = await this.client.mget(cacheKeys.map((cacheKey) => `${this.prefix}.${cacheKey}`));
 
     const map: Map<string, V> = new Map();
-    for (let i = 0; i < keys.length; ++i) {
+    for (let i = 0; i < cacheKeys.length; ++i) {
       // not checking for `null` here because interface
-      // expects V only; this is understanble, as we are getting
+      // expects V only; perhaps this is understanble, as we are getting
       // existing keys instead of querying a user key.
-      map.set(keys[i], JSON.parse(values[i]) as V);
+      // however, a deleted key may be a problem?
+      map.set(cacheKeys[i].split(this.sls)[0], JSON.parse(values[i]) as V);
     }
 
     return map;
@@ -298,7 +300,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
       return null;
     }
     // key exists & was deleted
-    else if (res == DELETED_VALUE) {
+    else if (res == DELETED_VALUE_PLACEHOLDER) {
       return {
         sortKey: cacheKey.sortKey,
         cachedValue: null,
@@ -363,6 +365,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
 
     // map `key|sortKey` to `sortKey` only
     const sortKeys = latestCacheKeys.map((v) => v.split(this.sls)[1]);
+
     // get the last one after sorting by `sortKey`s alone
     // this extra sort is needed because the first ordering respected key name too
     return sortKeys.sort().at(-1);
@@ -378,6 +381,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    */
   async put(cacheKey: CacheKey, value: V): Promise<void> {
     this.logger.debug("PUT called.", cacheKey);
+
     await this.asAtomic().sortkeycache_atomic_put(
       cacheKey.key,
       cacheKey.sortKey,
@@ -410,7 +414,7 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
     await this.asAtomic().sortkeycache_atomic_put(
       cacheKey.key,
       cacheKey.sortKey,
-      DELETED_VALUE, // instead of null, we put an empty string
+      DELETED_VALUE_PLACEHOLDER, // instead of null, we put an empty string
       this.minEntriesPerContract,
       this.maxEntriesPerContract,
       this.prefix,
@@ -459,19 +463,30 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
    * // output
    * ['c|3', 'b|5', 'a|6']
    * ```
+   *
+   * With an optional `maxSortKey`, the allowed maximum sortKey is limited.
+   * For the example array above, if we provide `maxSortKey = 3` then we get:
+   *
+   * ```ts
+   * ['c|3', 'b|2', 'a|2']
+   * ```
+   *
    * @param cacheKeys an array of cacheKeys in the form `key|sortKey`.
+   * @param maxSortKey optional maxSortKey, where larger sortKey's will be ignored
    * @returns a reduced array with the latest sortKey per key.
    */
-  private reduceCacheKeys(cacheKeys: string[]): string[] {
+  private reduceCacheKeys(cacheKeys: string[], maxSortKey?: string): string[] {
     return cacheKeys.reduce<{
       result: string[]; // accumulation of cacheKeys
       prevKey: string; // the last read key
     }>(
       (acc, cacheKey) => {
-        const key = cacheKey.split(this.sls)[0];
-        if (acc.prevKey !== key) {
-          acc.result.push(cacheKey);
-          acc.prevKey = key;
+        const [key, sortKey] = cacheKey.split(this.sls);
+        if (maxSortKey === undefined || sortKey <= maxSortKey) {
+          if (acc.prevKey !== key) {
+            acc.result.push(cacheKey);
+            acc.prevKey = key;
+          }
         }
         return acc;
       },
