@@ -1,6 +1,6 @@
 {
   "name": "warp-contracts-redis",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Redis implementation for Warp Contracts",
   "types": "./lib/types/index.d.ts",
   "main": "./lib/cjs/index.js",
