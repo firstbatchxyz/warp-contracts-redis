@@ -1,5 +1,5 @@
-import { CacheOptions } from "warp-contracts";
-import { RedisOptions } from "../../src";
+import type { CacheOptions } from "warp-contracts";
+import type { RedisOptions } from "../../src";
 
 export default {
   JEST_AFTERALL_TIMEOUT: 1000,

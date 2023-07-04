@@ -70,12 +70,13 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
       throw new Error("minEntries > maxEntries");
     }
 
+    // define client-side lua scripts
+    this.logger.debug("Defining Lua scripts.");
+    Object.entries(luaScripts).forEach(([name, definition]) => this.client.defineCommand(name, definition));
+
     if (this.isManaged) {
       this.logger.warn("Client is managed by user, skipping configurations.");
     } else {
-      // add lua scripts
-      this.logger.info("Defining Lua scripts.");
-      RedisCache.defineLuaScripts(this.client);
       // configure no-persistance
       if (cacheOptions.inMemory) {
         this.open().then(() => {
@@ -104,14 +105,6 @@ export class RedisCache<V = any> implements SortKeyCache<V> {
       // https://redis.io/docs/management/persistence/#snapshotting
       client.config("SET", "save", ""),
     ]);
-  }
-
-  /**
-   * Defines the Lua scripts needed by RedisCache to the provided client.
-   * @param client redis client that we are connected to
-   */
-  static defineLuaScripts(client: Redis) {
-    Object.entries(luaScripts).forEach(([name, definition]) => client.defineCommand(name, definition));
   }
 
   //////////////////// TRANSACTION LOGIC ////////////////////
