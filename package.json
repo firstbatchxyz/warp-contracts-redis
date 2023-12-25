@@ -1,6 +1,6 @@
 {
   "name": "warp-contracts-redis",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "description": "Redis implementation for Warp Contracts",
   "types": "./lib/types/index.d.ts",
   "main": "./lib/cjs/index.js",
@@ -51,9 +51,11 @@
     "LICENSE"
   ],
   "dependencies": {
-    "ioredis": "^5.3.2",
-    "safe-stable-stringify": "^2.4.3",
-    "warp-contracts": "^1.4.2"
+    "safe-stable-stringify": "^2.4.3"
+  },
+  "peerDependencies": {
+    "warp-contracts": "^1.4.2",
+    "ioredis": "^5.3.2"
   },
   "devDependencies": {
     "@types/jest": "^28.1.6",
