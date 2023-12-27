@@ -7,9 +7,10 @@ import stringify from "safe-stable-stringify";
 import { luaScripts } from "./luaScripts";
 import type { RedisOptions } from "./types/redisCache";
 
-/** A deleted value placeholder is to differentiate a `null` result that
- * may belong to a deleted key or a non-existent key. This is required due to
- * SortKeyCache logic.
+/**
+ * A deleted value placeholder is to differentiate a `null` result
+ * that may belong to a deleted key or a non-existent key.
+ * This is required due to SortKeyCache logic.
  */
 const DELETED_VALUE_PLACEHOLDER = "";
 
