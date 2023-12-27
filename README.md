@@ -1,7 +1,6 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![NPM](https://img.shields.io/npm/v/warp-contracts-redis?logo=npm&color=CB3837)](https://www.npmjs.com/package/warp-contracts-redis)
 ![Test Workflow](https://github.com/firstbatchxyz/warp-contracts-redis/actions/workflows/test.yml/badge.svg?branch=master)
-![Build Workflow](https://github.com/firstbatchxyz/warp-contracts-redis/actions/workflows/build.yml/badge.svg?branch=master)
 
 # Warp Contracts Redis Cache
 
@@ -68,8 +67,8 @@ For the managed version, simply create your `ioredis` client outside and pass it
 Tests require a Redis server running at the specified URL within `tests/constants`. We use the default Redis URL for that, if you would like to run tests on a custom URL you must change the URL within the constants file.
 
 ```sh
-yarn test         # test everything
-yarn test <path>  # test a specific suite
+pnpm test         # test everything
+pnpm test <path>  # test a specific suite
 ```
 
 ## Resources
