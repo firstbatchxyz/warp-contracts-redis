@@ -17,6 +17,14 @@ Warp Contracts will `open` and `close` the client many times, and we have seen t
 
 Some of the functionality is achieved via [Lua](https://www.lua.org/home.html) scripts (v5.1), which you can find under `src/lua` for _reference_; the actual scripts are written in `luaScripts.ts`. The `prefix` and `subLevelSeparator` must be provided as argument to Lua scripts, because multiple `RedisCache` instances may be created with different prefixes or sub-level separators but they may connect to the same client; and for that reason we can't simply hardcode them in the script.
 
+> [!TIP]
+>
+> To learn more about SortKeyCache, see the links below:
+>
+> - [SortKeyCache](https://github.com/warp-contracts/warp/blob/main/src/cache/SortKeyCache.ts)
+> - [Warp docs for SortKey](https://academy.warp.cc/docs/sdk/advanced/bundled-interaction#how-it-works)
+> - [KV class of SmartWeave](https://github.com/warp-contracts/warp/blob/main/src/legacy/smartweave-global.ts#L260)
+
 ## Installation
 
 You can install the NPM package as shown below:
@@ -71,10 +79,19 @@ pnpm test         # test everything
 pnpm test <path>  # test a specific suite
 ```
 
-## Resources
+## Building
 
-To learn more, see the links below:
+Build the package with:
 
-- [SortKeyCache](https://github.com/warp-contracts/warp/blob/main/src/cache/SortKeyCache.ts)
-- [Warp docs for SortKey](https://academy.warp.cc/docs/sdk/advanced/bundled-interaction#how-it-works)
-- [KV class of SmartWeave](https://github.com/warp-contracts/warp/blob/main/src/legacy/smartweave-global.ts#L260)
+```sh
+pnpm build
+```
+
+## Styling
+
+Check styling with:
+
+```sh
+pnpm format
+pnpm lint
+```
