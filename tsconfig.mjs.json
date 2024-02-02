@@ -4,8 +4,8 @@
   "compilerOptions": {
     "target": "es2019",
     "types": ["jest", "node"],
-    "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "module": "NodeNext",
     "sourceMap": true,
     "skipLibCheck": true,
     "isolatedModules": false,

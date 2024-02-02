@@ -1,11 +1,17 @@
 import type { SortKeyCache, PruneStats, BatchDBOp, CacheOptions } from "warp-contracts";
-import type { SortKeyCacheRangeOptions } from "warp-contracts/lib/types/cache/SortKeyCacheRangeOptions";
 import type { ChainableCommander } from "ioredis";
 import { CacheKey, genesisSortKey, LoggerFactory, SortKeyCacheResult, lastPossibleSortKey } from "warp-contracts";
 import { Redis } from "ioredis";
-import stringify from "safe-stable-stringify";
-import { luaScripts } from "./luaScripts";
-import type { RedisOptions } from "./types/redisCache";
+import { stringify } from "safe-stable-stringify";
+import { luaScripts } from "./luaScripts.js";
+import type { RedisOptions } from "./types/redisCache.js";
+
+interface SortKeyCacheRangeOptions {
+  gte?: string;
+  lt?: string;
+  reverse?: boolean | undefined;
+  limit?: number | undefined;
+}
 
 /**
  * A deleted value placeholder is to differentiate a `null` result

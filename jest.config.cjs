@@ -9,6 +9,7 @@ module.exports = {
   transform: {
     "^.+\\.(ts|js)$": "ts-jest",
   },
+  resolver: "jest-ts-webcompat-resolver",
   testTimeout: 100_000,
   // do this to always show a summary of failed tests, even if there is only one
   // reporters: [["default", { summaryThreshold: 1 }]],
