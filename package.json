@@ -1,6 +1,6 @@
 {
   "name": "warp-contracts-redis",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Redis implementation for Warp Contracts",
   "license": "MIT",
   "author": "FirstBatch Team <dev@firstbatch.xyz>",
