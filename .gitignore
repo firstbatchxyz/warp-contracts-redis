@@ -30,3 +30,6 @@ bundles/
 cache
 
 dump.rdb
+
+# parcel
+.parcel-cache

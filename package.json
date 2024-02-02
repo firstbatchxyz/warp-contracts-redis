@@ -2,21 +2,86 @@
   "name": "warp-contracts-redis",
   "version": "0.4.1",
   "description": "Redis implementation for Warp Contracts",
-  "types": "./lib/types/index.d.ts",
-  "main": "./lib/cjs/index.js",
-  "module": "./lib/mjs/index.js",
-  "type": "module",
   "license": "MIT",
   "author": "FirstBatch Team <dev@firstbatch.xyz>",
   "homepage": "https://github.com/firstbatchxyz/warp-contracts-redis#readme",
-  "contributors": [
-    "Faruk Can Özkan <farukcan@firstbatch.xyz>",
-    "Erhan Tezcan <erhan@firstbatch.xyz>"
-  ],
+  "type": "module",
+  "source": "src/index.ts",
+  "types": "lib/index.d.ts",
+  "cjs": "lib/index.cjs",
+  "mjs": "lib/index.mjs",
+  "exports": {
+    "types": "./lib/index.d.ts",
+    "import": "./lib/index.mjs",
+    "require": "./lib/index.cjs",
+    "default": "./lib/index.mjs"
+  },
+  "targets": {
+    "cjs": {
+      "outputFormat": "commonjs",
+      "isLibrary": true,
+      "context": "node"
+    },
+    "mjs": {
+      "outputFormat": "esmodule",
+      "isLibrary": true,
+      "context": "node"
+    }
+  },
   "sideEffects": false,
   "engines": {
     "node": ">=16.5"
   },
+  "files": [
+    "lib/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "parcel build",
+    "clean": "rimraf ./lib && rimraf ./.parcel-cache",
+    "check": "tsc --noEmit && echo 'All good.'",
+    "lint": "eslint '**/*.ts' && echo 'All good.'",
+    "format": "prettier --check '**/*.ts'",
+    "prepublishOnly": "pnpm lint:fix",
+    "preversion": "pnpm lint && pnpm build",
+    "version": "pnpm format && git add -A src",
+    "postversion": "git push && git push --tags",
+    "yalc:publish": "pnpm build && yalc publish --push",
+    "test": "jest --detectOpenHandles"
+  },
+  "dependencies": {
+    "safe-stable-stringify": "^2.4.3"
+  },
+  "peerDependencies": {
+    "ioredis": "^5.3.2",
+    "warp-contracts": "^1.4.2"
+  },
+  "devDependencies": {
+    "@parcel/config-default": "^2.11.0",
+    "@parcel/packager-ts": "^2.11.0",
+    "@parcel/transformer-typescript-tsc": "^2.11.0",
+    "@parcel/transformer-typescript-types": "^2.11.0",
+    "@types/jest": "^28.1.6",
+    "@types/node": "^18.0.6",
+    "@typescript-eslint/eslint-plugin": "^5.30.7",
+    "@typescript-eslint/parser": "^5.30.7",
+    "eslint": "^7.32.0",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-prettier": "^3.4.1",
+    "jest": "^29.5.0",
+    "jest-ts-webcompat-resolver": "^1.0.0",
+    "parcel": "^2.11.0",
+    "prettier": "^2.3.2",
+    "rimraf": "^3.0.2",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.2.1",
+    "typescript": "^4.7.4"
+  },
+  "contributors": [
+    "Faruk Can Özkan <farukcan@firstbatch.xyz>",
+    "Erhan Tezcan <erhan@firstbatch.xyz>"
+  ],
   "keywords": [
     "key-value store",
     "storage",
@@ -28,49 +93,7 @@
     "redis",
     "cache"
   ],
-  "scripts": {
-    "build:mjs": "tsc -b tsconfig.mjs.json",
-    "build:cjs": "tsc -b tsconfig.cjs.json",
-    "build:types": "tsc -b tsconfig.types.json",
-    "build": "pnpm run clean && pnpm build:cjs && pnpm build:mjs && pnpm build:types",
-    "format": "prettier --write 'src/**/*.ts'",
-    "clean": "rimraf ./lib",
-    "lint": "eslint . --ext .ts",
-    "lint:fix": "eslint . --ext .ts --fix",
-    "prettier:format": "prettier --config .prettierrc 'src/**/*.ts' --write",
-    "prepublishOnly": "pnpm lint:fix",
-    "preversion": "pnpm lint && pnpm build",
-    "version": "pnpm format && git add -A src",
-    "postversion": "git push && git push --tags",
-    "yalc:publish": "pnpm build && yalc publish --push",
-    "test": "jest --detectOpenHandles"
-  },
-  "files": [
-    "lib/",
-    "README.md",
-    "LICENSE"
-  ],
-  "dependencies": {
-    "safe-stable-stringify": "^2.4.3"
-  },
-  "peerDependencies": {
-    "ioredis": "^5.3.2",
-    "warp-contracts": "^1.4.2"
-  },
-  "devDependencies": {
-    "@types/jest": "^28.1.6",
-    "@types/node": "^18.0.6",
-    "@typescript-eslint/eslint-plugin": "^5.30.7",
-    "@typescript-eslint/parser": "^5.30.7",
-    "eslint": "^7.32.0",
-    "eslint-config-prettier": "^8.3.0",
-    "eslint-plugin-prettier": "^3.4.1",
-    "jest": "^29.5.0",
-    "jest-ts-webcompat-resolver": "^1.0.0",
-    "prettier": "^2.3.2",
-    "rimraf": "^3.0.2",
-    "ts-jest": "^29.1.0",
-    "ts-node": "^10.2.1",
-    "typescript": "^4.7.4"
+  "prettier": {
+    "printWidth": 120
   }
 }
