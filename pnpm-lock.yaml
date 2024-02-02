@@ -40,6 +40,9 @@ devDependencies:
   jest:
     specifier: ^29.5.0
     version: 29.7.0(@types/node@18.19.3)(ts-node@10.9.2)
+  jest-ts-webcompat-resolver:
+    specifier: ^1.0.0
+    version: 1.0.0(jest-resolve@29.7.0)
   prettier:
     specifier: ^2.3.2
     version: 2.8.8
@@ -2666,6 +2669,14 @@ packages:
       semver: 7.5.4
     transitivePeerDependencies:
       - supports-color
+    dev: true
+
+  /jest-ts-webcompat-resolver@1.0.0(jest-resolve@29.7.0):
+    resolution: {integrity: sha512-BFoaU7LeYqZNnTYEr6iMRf87xdCQntNc/Wk8YpzDBcuz+CIZ0JsTtzuMAMnKiEgTRTC1wRWLUo2RlVjVijBcHQ==}
+    peerDependencies:
+      jest-resolve: '*'
+    dependencies:
+      jest-resolve: 29.7.0
     dev: true
 
   /jest-util@28.1.3:

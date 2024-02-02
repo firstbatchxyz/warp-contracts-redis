@@ -4,15 +4,15 @@
   "compilerOptions": {
     "target": "es2019",
     "types": ["jest", "node"],
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
     "sourceMap": true,
     "skipLibCheck": true,
     "isolatedModules": false,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
-    "outDir": "./lib/mjs",
+    "outDir": "./lib/cjs",
     "baseUrl": "./src",
     "allowJs": true
   },

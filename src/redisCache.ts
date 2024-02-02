@@ -2,9 +2,9 @@ import type { SortKeyCache, PruneStats, BatchDBOp, CacheOptions } from "warp-con
 import type { ChainableCommander } from "ioredis";
 import { CacheKey, genesisSortKey, LoggerFactory, SortKeyCacheResult, lastPossibleSortKey } from "warp-contracts";
 import { Redis } from "ioredis";
-import stringify from "safe-stable-stringify";
-import { luaScripts } from "./luaScripts";
-import type { RedisOptions } from "./types/redisCache";
+import { stringify } from "safe-stable-stringify";
+import { luaScripts } from "./luaScripts.js";
+import type { RedisOptions } from "./types/redisCache.js";
 
 interface SortKeyCacheRangeOptions {
   gte?: string;
